@@ -1,0 +1,36 @@
+:host {
+  display: block;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.cad-shell {
+  display: grid;
+  grid-template-rows: 30px 62px 34px 1fr 26px;
+  grid-template-areas:
+    'menu'
+    'ribbon'
+    'toolbar'
+    'main'
+    'status';
+  height: 100%;
+  width: 100%;
+  background: var(--cad-bg);
+  color: var(--cad-text);
+  font-family: var(--cad-font);
+}
+
+.cad-main {
+  grid-area: main;
+  display: grid;
+  grid-template-columns: 240px 1fr 260px;
+  grid-template-areas: 'tree viewport properties';
+  overflow: hidden;
+  min-height: 0;
+}
+
+.cad-main app-viewport {
+  grid-area: viewport;
+  min-width: 0;
+}

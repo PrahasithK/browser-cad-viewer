@@ -1,1 +1,93 @@
-/* You can add global styles to this file, and also import other style files */
+/*
+ * Design tokens — single source of truth for the app's dark CAD theme. Previously every
+ * component CSS file repeated these as raw hex literals (e.g. #2a6fdb 16x, #44464c 27x);
+ * consolidated here so a future theme/contrast pass touches one place instead of five.
+ */
+:root {
+  /* Surfaces, darkest to lightest */
+  --cad-bg: #1e1f22;
+  --cad-bg-inset: #1c1d20;
+  --cad-surface: #232427;
+  --cad-surface-alt: #26272b;
+  --cad-panel-bg: #2b2c30;
+  --cad-panel-bg-translucent: rgba(35, 36, 39, 0.95);
+  --cad-control-bg: #26272a;
+  --cad-control-bg-alt: #33353a;
+  --cad-control-bg-hover: #3f424a;
+
+  /* Borders */
+  --cad-border: #44464c;
+  --cad-border-subtle: #3a3b3f;
+  --cad-border-faint: #34353a;
+
+  /* Text */
+  --cad-text: #d4d5d8;
+  --cad-text-bright: #e2e3e6;
+  --cad-text-secondary: #9a9ba0;
+  --cad-text-muted: #7d7e83;
+  --cad-text-faint: #6f7075;
+
+  /* Accent (selection/primary action) */
+  --cad-accent: #2a6fdb;
+  --cad-accent-border: #3a7fe8;
+  --cad-accent-hover: #3a7fe8;
+
+  /* Semantic */
+  --cad-danger: #c0392b;
+  --cad-danger-text: #ff8a8a;
+  --cad-error: #ff6b6b;
+  --cad-warning: #ffcc00;
+  --cad-highlight-box: #ffa500;
+  --cad-dimension-body: #7db3ff;
+
+  /* Spacing scale */
+  --cad-space-1: 2px;
+  --cad-space-2: 4px;
+  --cad-space-3: 8px;
+  --cad-space-4: 12px;
+  --cad-space-5: 16px;
+
+  /* Radius */
+  --cad-radius-sm: 3px;
+  --cad-radius-md: 4px;
+  --cad-radius-lg: 6px;
+
+  /* Font */
+  --cad-font: 'Segoe UI', Roboto, -apple-system, sans-serif;
+  --cad-font-mono: 'Consolas', monospace;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: var(--cad-font);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cad-bg-inset);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cad-border);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #55575e;
+}

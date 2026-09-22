@@ -1,0 +1,201 @@
+/*
+ * Flex row: <app-tool-panels> is display:contents (see tool-panels.css), so its 3 top-level
+ * elements — dock-left column, .canvas-overlay (which projects this template's canvas/
+ * nav-cube/loading/context-menu content via <ng-content>), dock-right column — become real
+ * flex-item children of THIS row. Docking a panel therefore actually shrinks the canvas: the
+ * dock column takes real flex space, .canvas-overlay's flex:1 gives up exactly that much width.
+ */
+.viewport-container {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--cad-bg);
+}
+
+.viewport-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+/* Navigation cube */
+.nav-cube-container {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 96px;
+  height: 96px;
+  z-index: 200;
+  cursor: pointer;
+}
+
+.nav-cube-container canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * Dimension labels — in-viewport text, positioned per-frame. Two sources feed the same layer:
+ * `.measurement` (yellow, matches MeasurementService's existing marker/line color) for Distance
+ * tool results, and `.body-size` (blue, matches SelectionService's existing highlight tint) for
+ * the selected body's overall Length/Width/Height, shown automatically on selection.
+ */
+.dimension-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 150;
+}
+
+.dimension-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 21, 24, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.dimension-label.measurement {
+  color: var(--cad-warning);
+  border: 1px solid rgba(255, 204, 0, 0.4);
+}
+
+.dimension-label.body-size {
+  color: var(--cad-dimension-body);
+  border: 1px solid rgba(125, 179, 255, 0.4);
+}
+
+/* Loading dialog */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 16, 18, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+}
+
+.loading-dialog {
+  background: var(--cad-panel-bg);
+  border: 1px solid var(--cad-border);
+  border-radius: 8px;
+  padding: 24px 32px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--cad-border);
+  border-top-color: var(--cad-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-message {
+  font-size: 13px;
+  color: var(--cad-text-bright);
+  text-align: center;
+}
+
+.progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--cad-bg-inset);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--cad-accent);
+  transition: width 0.15s ease;
+}
+
+.progress-percent {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+}
+
+.error-message {
+  font-size: 12px;
+  color: var(--cad-error);
+  text-align: center;
+}
+
+/* Context menu */
+.context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 901;
+  background: var(--cad-panel-bg);
+  border: 1px solid var(--cad-border);
+  border-radius: 5px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  padding: 4px;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+}
+
+.context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: var(--cad-text);
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.context-menu button:hover {
+  background: var(--cad-accent);
+  color: #fff;
+}
+
+.menu-divider {
+  height: 1px;
+  background: var(--cad-border-subtle);
+  margin: 4px 2px;
+}
+
+.context-menu button.danger {
+  color: var(--cad-danger-text);
+}
+
+.context-menu button.danger:hover {
+  background: var(--cad-danger);
+  color: #fff;
+}
+
+.hidden-file-input {
+  display: none;
+}

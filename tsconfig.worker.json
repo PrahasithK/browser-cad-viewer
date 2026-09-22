@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/worker",
+    "lib": ["ES2022", "WebWorker"],
+    "module": "ES2022",
+    "types": []
+  },
+  "include": ["src/app/workers/**/*.ts", "src/app/models/opencascade.d.ts"]
+}

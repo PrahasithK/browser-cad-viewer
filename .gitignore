@@ -37,6 +37,9 @@ yarn-error.log
 testem.log
 /typings
 
+# Claude Code local settings (per-machine, not shared)
+.claude/settings.local.json
+
 # System files
 .DS_Store
 Thumbs.db

@@ -18,28 +18,39 @@
               "zone.js"
             ],
             "tsConfig": "tsconfig.app.json",
+            "webWorkerTsConfig": "tsconfig.worker.json",
             "assets": [
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "**/*.wasm",
+                "input": "node_modules/opencascade.js/dist",
+                "output": "assets/occt"
               }
             ],
             "styles": [
+              "@angular/material/prebuilt-themes/azure-blue.css",
               "src/styles.css"
             ]
           },
           "configurations": {
             "production": {
+              "externalDependencies": [
+                "fs",
+                "path"
+              ],
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kB",
-                  "maximumError": "1MB"
+                  "maximumWarning": "2MB",
+                  "maximumError": "4MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "24kB",
+                  "maximumError": "32kB"
                 }
               ],
               "outputHashing": "all"
@@ -75,6 +86,10 @@
               "zone.js/testing"
             ],
             "tsConfig": "tsconfig.spec.json",
+            "externalDependencies": [
+              "fs",
+              "path"
+            ],
             "assets": [
               {
                 "glob": "**/*",
@@ -88,5 +103,8 @@
         }
       }
     }
+  },
+  "cli": {
+    "analytics": false
   }
 }

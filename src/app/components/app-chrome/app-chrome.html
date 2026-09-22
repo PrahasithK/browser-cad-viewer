@@ -1,0 +1,205 @@
+<div class="menu-bar">
+  @for (menu of menus; track menu.label) {
+    <div class="menu-item-wrapper">
+      <button type="button" class="menu-item" [class.active]="openMenu() === menu.label" (click)="toggleMenu(menu.label)">
+        {{ menu.label }}
+      </button>
+      @if (openMenu() === menu.label) {
+        <div class="dropdown">
+          @for (item of menu.items; track item.label) {
+            <button type="button" class="dropdown-item" (click)="runAction(item.action)">{{ item.label }}</button>
+          }
+        </div>
+      }
+    </div>
+  }
+  <div class="menu-title">Browser CAD Viewer</div>
+</div>
+
+<div class="ribbon">
+  <div class="ribbon-group">
+    <div class="group-buttons">
+      <button type="button" class="ribbon-btn" title="Clear Selection (Esc)" (click)="clearSelection()">Clear Selection</button>
+    </div>
+    <div class="group-label">Selection</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="group-buttons">
+      <button type="button" class="ribbon-btn icon-btn" title="Move (G)" aria-label="Move" [class.active]="transformMode() === 'translate'" [disabled]="!hasSelection()" (click)="toggleTransformMode('translate')"><app-icon name="move" [size]="14" /></button>
+      <button type="button" class="ribbon-btn icon-btn" title="Rotate (R)" aria-label="Rotate" [class.active]="transformMode() === 'rotate'" [disabled]="!hasSelection()" (click)="toggleTransformMode('rotate')"><app-icon name="rotate" [size]="14" /></button>
+      <button type="button" class="ribbon-btn icon-btn" title="Scale (Y)" aria-label="Scale" [class.active]="transformMode() === 'scale'" [disabled]="!hasSelection()" (click)="toggleTransformMode('scale')"><app-icon name="scale" [size]="14" /></button>
+    </div>
+    <div class="group-label">Transform</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="group-buttons">
+      <button type="button" class="ribbon-btn" title="Distance (M)" [class.active]="measureActive()" (click)="toggleMeasure()">Distance</button>
+      <button type="button" class="ribbon-btn" (click)="clearMeasurements()">Clear</button>
+    </div>
+    <div class="group-label">Measure</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="group-buttons">
+      <button type="button" class="ribbon-btn" title="Sketch (S)" [class.active]="sketchActive()" (click)="toggleSketch()">Sketch</button>
+      <button type="button" class="ribbon-btn" title="Loft — blend between 2+ sketch profiles into one solid" [class.active]="loftActive()" (click)="toggleLoft()">Loft</button>
+    </div>
+    <div class="group-label">Design</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="group-buttons">
+      <button type="button" class="ribbon-btn" [class.active]="primitiveActive('box')" (click)="togglePrimitive('box')">Box</button>
+      <button type="button" class="ribbon-btn" [class.active]="primitiveActive('cylinder')" (click)="togglePrimitive('cylinder')">Cylinder</button>
+      <button type="button" class="ribbon-btn" [class.active]="primitiveActive('sphere')" (click)="togglePrimitive('sphere')">Sphere</button>
+      <button type="button" class="ribbon-btn" [class.active]="primitiveActive('cone')" (click)="togglePrimitive('cone')">Cone</button>
+    </div>
+    <div class="group-label">Add Shape</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="group-buttons">
+      <button type="button" class="ribbon-btn" title="Fillet / Chamfer — pick an edge on a part" [class.active]="filletChamferActive()" (click)="toggleFilletChamfer()">Fillet / Chamfer</button>
+      <button type="button" class="ribbon-btn" title="Pattern — array-copy the selected part" [class.active]="patternActive()" [disabled]="!hasSelection() && !patternActive()" (click)="togglePattern()">Pattern</button>
+      <button type="button" class="ribbon-btn" title="Mirror — reflect the selected part across a plane" [class.active]="mirrorActive()" [disabled]="!hasSelection() && !mirrorActive()" (click)="toggleMirror()">Mirror</button>
+      <button type="button" class="ribbon-btn" title="Hole Wizard — cut a standard fastener-size hole on a picked face" [class.active]="holeWizardActive()" (click)="toggleHoleWizard()">Hole Wizard</button>
+      <button type="button" class="ribbon-btn" title="Shell — hollow out a part to a wall thickness, removing picked faces" [class.active]="shellActive()" (click)="toggleShell()">Shell</button>
+      <button type="button" class="ribbon-btn" title="Draft — add a mold-pull angle to picked faces" [class.active]="draftActive()" (click)="toggleDraft()">Draft</button>
+    </div>
+    <div class="group-label">Features</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="group-buttons">
+      <button type="button" class="ribbon-btn" title="Reference Plane — create a named offset plane from a datum or picked face" [class.active]="referencePlaneActive()" (click)="toggleReferencePlane()">Reference Plane</button>
+    </div>
+    <div class="group-label">Reference Geometry</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="group-buttons">
+      <button type="button" class="ribbon-btn" [class.active]="structuralNodeActive()" (click)="toggleStructuralNode()">Add Node</button>
+      <button type="button" class="ribbon-btn" [class.active]="structuralMemberActive()" (click)="toggleStructuralMember()">Add Member</button>
+    </div>
+    <div class="group-label">Structural</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="group-buttons">
+      <button type="button" class="ribbon-btn" [class.active]="bridgeMeshActive()" (click)="toggleBridgeMesh()">Bridge Mesh</button>
+    </div>
+    <div class="group-label">Meshing</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="group-buttons">
+      <button type="button" class="ribbon-btn" [class.active]="meshViewActive()" (click)="toggleMeshView()">Mesh View</button>
+      <button type="button" class="ribbon-btn" [class.active]="featureTreePanelOpen()" (click)="toggleFeatureTreePanel()" title="Feature Tree — edit a previously-applied Extrude">Feature Tree</button>
+    </div>
+    <div class="group-label">Display</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="group-buttons">
+      <button type="button" class="ribbon-btn" [class.active]="sectionConfigs().x.enabled" (click)="toggleSection('x')">X Plane</button>
+      <button type="button" class="ribbon-btn" [class.active]="sectionConfigs().y.enabled" (click)="toggleSection('y')">Y Plane</button>
+      <button type="button" class="ribbon-btn" [class.active]="sectionConfigs().z.enabled" (click)="toggleSection('z')">Z Plane</button>
+    </div>
+    <div class="group-label">Section</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="group-buttons explode-buttons">
+      <input
+        type="range"
+        min="0"
+        max="500"
+        step="1"
+        title="Explode amount"
+        [value]="explodeAmount()"
+        (input)="onExplodeChange($event)"
+        class="explode-slider"
+      />
+      <button type="button" class="ribbon-btn" (click)="resetExplode()">Reset</button>
+    </div>
+    <div class="group-label">Exploded View</div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="history-btn-group">
+    <button type="button" class="tool-btn" title="Undo (Ctrl+Z)" aria-label="Undo" [disabled]="!canUndo()" (click)="undo()"><app-icon name="undo" /></button>
+    <button type="button" class="history-caret" title="Undo history" aria-label="Undo history" [disabled]="!canUndo()" (click)="toggleHistoryDropdown('undo')"><app-icon name="chevron-down-small" [size]="9" /></button>
+    @if (historyDropdown() === 'undo') {
+      <div class="history-dropdown">
+        @if (undoEntries().length === 0) {
+          <div class="history-dropdown-empty">No undo history</div>
+        }
+        @for (entry of undoEntries(); track $index) {
+          <button type="button" class="history-dropdown-item" [class.current]="$index === 0" (click)="jumpUndo($index)">{{ entry }}</button>
+        }
+      </div>
+    }
+  </div>
+  <div class="history-btn-group">
+    <button type="button" class="tool-btn" title="Redo (Ctrl+Y)" aria-label="Redo" [disabled]="!canRedo()" (click)="redo()"><app-icon name="redo" /></button>
+    <button type="button" class="history-caret" title="Redo history" aria-label="Redo history" [disabled]="!canRedo()" (click)="toggleHistoryDropdown('redo')"><app-icon name="chevron-down-small" [size]="9" /></button>
+    @if (historyDropdown() === 'redo') {
+      <div class="history-dropdown">
+        @if (redoEntries().length === 0) {
+          <div class="history-dropdown-empty">No redo history</div>
+        }
+        @for (entry of redoEntries(); track $index) {
+          <button type="button" class="history-dropdown-item" [class.current]="$index === 0" (click)="jumpRedo($index)">{{ entry }}</button>
+        }
+      </div>
+    }
+  </div>
+
+  <span class="separator"></span>
+
+  <button type="button" class="tool-btn" title="Fit All (F)" aria-label="Fit All" (click)="fitAll()"><app-icon name="fit-all" /></button>
+  <button type="button" class="tool-btn" title="Reset Camera" aria-label="Reset Camera" (click)="resetCamera()"><app-icon name="reset-camera" /></button>
+  <button type="button" class="tool-btn" title="Toggle Projection" aria-label="Toggle Projection" (click)="toggleProjection()"><app-icon name="projection" /></button>
+
+  <span class="separator"></span>
+
+  @for (item of viewPresets; track item.preset; let i = $index) {
+    <button type="button" class="tool-btn small" [title]="item.label + ' (' + (i + 1) + ')'" [attr.aria-label]="item.label" (click)="applyPreset(item.preset)">{{ item.label[0] }}</button>
+  }
+
+  <span class="separator"></span>
+
+  <button type="button" class="tool-btn" [class.active]="shadingMode() === 'solid'" title="Solid" aria-label="Solid shading" (click)="setShading('solid')"><app-icon name="shading-solid" /></button>
+  <button type="button" class="tool-btn" [class.active]="shadingMode() === 'wireframe'" title="Wireframe" aria-label="Wireframe shading" (click)="setShading('wireframe')"><app-icon name="shading-wireframe" /></button>
+  <button type="button" class="tool-btn" [class.active]="shadingMode() === 'transparent'" title="Transparent" aria-label="Transparent shading" (click)="setShading('transparent')"><app-icon name="shading-transparent" /></button>
+
+  <span class="separator"></span>
+
+  <button type="button" class="tool-btn" title="Toggle Grid" aria-label="Toggle Grid" (click)="toggleGrid()"><app-icon name="grid" /></button>
+  <button type="button" class="tool-btn" title="Toggle Axes" aria-label="Toggle Axes" (click)="toggleAxes()"><app-icon name="axes" /></button>
+
+  <span class="separator"></span>
+
+  <button type="button" class="tool-btn" title="Screenshot" aria-label="Screenshot" (click)="screenshot()"><app-icon name="camera" /></button>
+  <button type="button" class="tool-btn" title="Fullscreen" aria-label="Fullscreen" (click)="toggleFullscreen()"><app-icon name="fullscreen" /></button>
+  <button type="button" class="tool-btn" [class.active]="darkMode()" title="Dark Mode" aria-label="Toggle Dark Mode" (click)="toggleDarkMode()"><app-icon name="dark-mode" /></button>
+</div>
+
+<div class="status-bar">
+  <span class="status-item">{{ selectedLabel() }}</span>
+  <span class="divider"></span>
+  <span class="status-item">{{ bodyCount() }} bodies</span>
+  <span class="divider"></span>
+  <span class="status-item">{{ triangleCount() | number }} triangles</span>
+  <span class="divider"></span>
+  <span class="status-item coords">{{ cursorCoords() }}</span>
+  <span class="spacer"></span>
+  <span class="status-item fps">{{ fps() }} FPS</span>
+  <span class="divider"></span>
+  <span class="status-item">{{ projection() === 'perspective' ? 'Perspective' : 'Orthographic' }}</span>
+  <span class="divider"></span>
+  <span class="status-item">Units: mm</span>
+</div>

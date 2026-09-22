@@ -1,0 +1,285 @@
+:host {
+  display: contents;
+}
+
+.empty-state {
+  padding: 20px 10px;
+  text-align: center;
+  color: var(--cad-text-faint);
+  font-size: 12px;
+}
+
+/* Model tree */
+.model-tree {
+  grid-area: tree;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--cad-surface);
+  border-right: 1px solid var(--cad-border-subtle);
+  overflow: hidden;
+}
+
+/* Resize handles — width itself is owned by App's grid-template-columns binding (see app.ts);
+   dragging these emits treeWidthChange/propertiesWidthChange, which App applies to the grid. */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 10;
+  touch-action: none;
+}
+
+.resize-handle:hover {
+  background: rgba(42, 111, 219, 0.4);
+}
+
+.resize-handle-tree {
+  right: -3px;
+}
+
+.resize-handle-properties {
+  left: -3px;
+}
+
+.tree-header {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cad-text-secondary);
+  border-bottom: 1px solid var(--cad-border-subtle);
+  flex-shrink: 0;
+}
+
+/* Search/filter box — narrows the tree by label, case-insensitive, auto-expanding matches' ancestors */
+.tree-filter-row {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--cad-border-subtle);
+  flex-shrink: 0;
+}
+
+.tree-filter-input {
+  width: 100%;
+  background: var(--cad-bg-inset);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.tree-filter-input:focus {
+  outline: none;
+  border-color: var(--cad-accent);
+}
+
+.tree-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #cfd0d4;
+  gap: 6px;
+  padding-right: 8px;
+}
+
+.tree-node:hover {
+  background: #2b2d31;
+}
+
+.tree-node.selected {
+  background: var(--cad-accent);
+  color: #fff;
+}
+
+.expand-icon {
+  width: 12px;
+  font-size: 10px;
+  color: var(--cad-text-secondary);
+  text-align: center;
+}
+
+.expand-icon.spacer {
+  visibility: hidden;
+}
+
+.node-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.node-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visibility-toggle,
+.delete-toggle {
+  display: inline-flex;
+  opacity: 0.7;
+}
+
+.visibility-toggle:hover,
+.delete-toggle:hover {
+  opacity: 1;
+}
+
+.delete-toggle:hover {
+  color: var(--cad-error);
+}
+
+.node-rename-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--cad-bg-inset);
+  border: 1px solid var(--cad-accent);
+  border-radius: var(--cad-radius-sm);
+  color: var(--cad-text-bright);
+  font-size: 12px;
+  padding: 1px 4px;
+}
+
+/* Properties */
+.properties-panel {
+  grid-area: properties;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--cad-surface);
+  border-left: 1px solid var(--cad-border-subtle);
+  overflow: hidden;
+}
+
+.panel-header {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cad-text-secondary);
+  border-bottom: 1px solid var(--cad-border-subtle);
+  flex-shrink: 0;
+  transition: background-color 0.3s ease;
+}
+
+/* Brief highlight pulse when "Properties" is invoked from the context menu, so the (always-
+   visible) panel gives feedback rather than silently doing nothing. */
+.panel-header.flash {
+  background: rgba(42, 111, 219, 0.35);
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+
+.prop-section {
+  margin-bottom: 14px;
+}
+
+.section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cad-text-muted);
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--cad-border-faint);
+  padding-bottom: 4px;
+}
+
+.prop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  gap: 8px;
+}
+
+.prop-label {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  flex-shrink: 0;
+}
+
+.prop-value {
+  font-size: 12px;
+  color: var(--cad-text-bright);
+  text-align: right;
+}
+
+.prop-value.small {
+  font-size: 10px;
+  font-family: var(--cad-font-mono);
+}
+
+.prop-value.editable {
+  cursor: text;
+  border-bottom: 1px dashed transparent;
+}
+
+.prop-value.editable:hover {
+  border-bottom-color: var(--cad-text-faint);
+}
+
+.name-edit-input {
+  width: 130px;
+  background: var(--cad-bg-inset);
+  border: 1px solid var(--cad-accent);
+  border-radius: var(--cad-radius-sm);
+  color: var(--cad-text-bright);
+  font-size: 12px;
+  padding: 2px 4px;
+  text-align: right;
+}
+
+.properties-panel input[type='range'] {
+  width: 110px;
+}
+
+.properties-panel input[type='color'] {
+  width: 32px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-sm);
+  background: none;
+}
+
+.prop-select {
+  min-width: 0;
+  max-width: 150px;
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-sm);
+  color: var(--cad-text-bright);
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+.prop-hint {
+  font-size: 10px;
+  color: var(--cad-text-muted);
+  padding: 2px 0 0;
+}

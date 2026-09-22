@@ -1,0 +1,79 @@
+<div
+  #container
+  class="viewport-container"
+  (contextmenu)="onContextMenu($event)"
+>
+  <app-tool-panels>
+    <canvas
+      #canvas
+      (pointerdown)="onCanvasPointerDown($event)"
+      (pointermove)="onCanvasPointerMove($event)"
+      (click)="onCanvasClick($event)"
+      (dblclick)="onCanvasDoubleClick($event)"
+    ></canvas>
+
+    <div class="nav-cube-container">
+      <canvas #navCubeCanvas (click)="onNavCubeClick($event)" (dblclick)="applyNavCubeIso()"></canvas>
+    </div>
+
+    <div class="dimension-labels">
+      @for (label of measurementLabels(); track label.id) {
+        <div class="dimension-label measurement" [style.left.px]="label.x" [style.top.px]="label.y">{{ label.text }}</div>
+      }
+      @for (label of bodyDimensionLabels(); track label.id) {
+        <div class="dimension-label body-size" [style.left.px]="label.x" [style.top.px]="label.y">{{ label.text }}</div>
+      }
+    </div>
+
+    <input
+      #stepFileInput
+      type="file"
+      accept=".step,.stp,.STEP,.STP"
+      class="hidden-file-input"
+      title="Import STEP file"
+      (change)="onStepFileSelected($event)"
+    />
+
+    @if (loadingVisible) {
+      <div class="loading-overlay">
+        <div class="loading-dialog">
+          <div class="spinner"></div>
+          <div class="loading-message">{{ loadingProgress().message }}</div>
+          @if (!loadingProgress().indeterminate && loadingProgress().percent !== undefined) {
+            <div class="progress-track">
+              <div class="progress-fill" [style.width.%]="loadingProgress().percent"></div>
+            </div>
+            <div class="progress-percent">{{ loadingProgress().percent }}%</div>
+          }
+          @if (!loadingProgress().indeterminate && loadingProgress().bodyCount) {
+            <div class="progress-percent">{{ loadingProgress().bodyIndex }} / {{ loadingProgress().bodyCount }} bodies</div>
+          }
+          @if (loadingProgress().phase === 'error') {
+            <div class="error-message">{{ loadingProgress().error }}</div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (contextMenuPosition(); as pos) {
+      <div class="context-menu-backdrop" (click)="closeContextMenu()" (contextmenu)="$event.preventDefault(); closeContextMenu()"></div>
+      <div class="context-menu" [style.left.px]="pos.x" [style.top.px]="pos.y">
+        <button type="button" (click)="contextMenuHide()"><app-icon name="eye-off" [size]="13" />Hide</button>
+        <button type="button" (click)="contextMenuIsolate()"><app-icon name="isolate" [size]="13" />Isolate</button>
+        <button type="button" (click)="contextMenuShowAll()"><app-icon name="show-all" [size]="13" />Show All</button>
+        <button type="button" (click)="contextMenuTransparent()"><app-icon name="shading-transparent" [size]="13" />Toggle Transparent</button>
+        <button type="button" (click)="contextMenuFocus()"><app-icon name="focus" [size]="13" />Zoom to Fit</button>
+        <div class="menu-divider"></div>
+        @if (contextMenuHasSelection()) {
+          <button type="button" (click)="contextMenuRename()"><app-icon name="rename" [size]="13" />Rename</button>
+          <button type="button" (click)="contextMenuDuplicate()"><app-icon name="duplicate" [size]="13" />Duplicate</button>
+        }
+        <button type="button" (click)="contextMenuProperties()"><app-icon name="properties" [size]="13" />Properties</button>
+        @if (contextMenuHasSelection()) {
+          <div class="menu-divider"></div>
+          <button type="button" class="danger" title="Delete (Del)" (click)="contextMenuDelete()"><app-icon name="trash" [size]="13" />Delete Part</button>
+        }
+      </div>
+    }
+  </app-tool-panels>
+</div>

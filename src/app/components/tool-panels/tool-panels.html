@@ -1,0 +1,1023 @@
+<div class="dock-column dock-left" [class.dock-column-empty]="!hasDockedPanels('docked-left')">
+  <ng-container *ngTemplateOutlet="measureTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="sectionTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="sketchTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="structuralTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="resultsTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="bridgeTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="primitiveTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="filletChamferTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="patternTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="mirrorTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="holeWizardTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="referencePlaneTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="shellTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="draftTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="loftTpl; context: { dock: 'docked-left' }"></ng-container>
+  <ng-container *ngTemplateOutlet="featureTreeTpl; context: { dock: 'docked-left' }"></ng-container>
+</div>
+
+<div class="canvas-overlay" #canvasOverlay>
+  <ng-content></ng-content>
+
+  <ng-container *ngTemplateOutlet="measureTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="sectionTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="sketchTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="structuralTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="resultsTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="bridgeTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="primitiveTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="filletChamferTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="patternTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="mirrorTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="holeWizardTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="referencePlaneTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="shellTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="draftTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="loftTpl; context: { dock: 'floating' }"></ng-container>
+  <ng-container *ngTemplateOutlet="featureTreeTpl; context: { dock: 'floating' }"></ng-container>
+
+  @if (dockZoneHighlight(); as zone) {
+    <div class="dock-zone-indicator" [class.dock-zone-left]="zone === 'left'" [class.dock-zone-right]="zone === 'right'"></div>
+  }
+</div>
+
+<div class="dock-column dock-right" [class.dock-column-empty]="!hasDockedPanels('docked-right')">
+  <ng-container *ngTemplateOutlet="measureTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="sectionTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="sketchTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="structuralTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="resultsTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="bridgeTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="primitiveTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="filletChamferTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="patternTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="mirrorTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="holeWizardTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="referencePlaneTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="shellTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="draftTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="loftTpl; context: { dock: 'docked-right' }"></ng-container>
+  <ng-container *ngTemplateOutlet="featureTreeTpl; context: { dock: 'docked-right' }"></ng-container>
+</div>
+
+<ng-template #measureTpl let-dock="dock">
+  @if (measureActive() && dockModeFor('measure') === dock) {
+    <div class="measure-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('measure')" [style.top.px]="panelTop('measure')">
+      <div class="panel-title" appPanelDragHandle="measure" (dragMove)="onPanelDragMove('measure', $event)" (dragEnd)="onPanelDragEnd('measure', $event)">
+        Measure
+        <button type="button" class="close-btn" (click)="closeMeasure()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+      <div class="kind-toggle">
+        @for (m of measureModes; track m.id) {
+          <button type="button" class="kind-btn" [class.active]="measureMode() === m.id" [title]="m.title" (click)="setMeasureMode(m.id)">{{ m.label }}</button>
+        }
+      </div>
+      <div class="hint">{{ measureHint() }}</div>
+      @if (measureError(); as err) {
+        <div class="error">{{ err }}</div>
+      }
+      @for (m of measurements(); track m.id) {
+        <div class="measurement-row">{{ m.text }}</div>
+      }
+      <button type="button" class="clear-btn" (click)="clearMeasurements()">Clear All</button>
+    </div>
+  }
+</ng-template>
+
+<ng-template #sectionTpl let-dock="dock">
+  @if (sectionAnyEnabled() && dockModeFor('section') === dock) {
+    <div class="section-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('section')" [style.top.px]="panelTop('section')">
+      <div class="panel-title" appPanelDragHandle="section" (dragMove)="onPanelDragMove('section', $event)" (dragEnd)="onPanelDragEnd('section', $event)">Section Planes</div>
+      @for (axis of sectionAxes; track axis) {
+        @if (sectionConfigs()[axis].enabled) {
+          <div class="axis-row">
+            <span class="axis-label">{{ axis.toUpperCase() }}</span>
+            <input
+              type="range"
+              title="Section offset"
+              [min]="sectionConfigs()[axis].min"
+              [max]="sectionConfigs()[axis].max"
+              [value]="sectionConfigs()[axis].offset"
+              (pointerdown)="onSectionOffsetDragStart(axis)"
+              (input)="onSectionOffsetChange(axis, $event)"
+              (change)="onSectionOffsetDragEnd(axis)"
+            />
+            <button type="button" class="flip-btn" (click)="toggleSectionFlip(axis)" title="Flip" aria-label="Flip"><app-icon name="flip" [size]="12" /></button>
+            <button type="button" class="off-btn" (click)="toggleSectionEnabled(axis)" title="Turn off" aria-label="Turn off"><app-icon name="close" [size]="11" /></button>
+          </div>
+        }
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #sketchTpl let-dock="dock">
+  @if (isSketchActive() && dockModeFor('sketch') === dock) {
+    <div class="sketch-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('sketch')" [style.top.px]="panelTop('sketch')">
+      <div class="panel-title" appPanelDragHandle="sketch" (dragMove)="onPanelDragMove('sketch', $event)" (dragEnd)="onPanelDragEnd('sketch', $event)">
+        Sketch
+        <button type="button" class="close-btn" (click)="closeSketch()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      @if (sketchState().phase === 'picking-plane' || sketchState().phase === 'picking-face') {
+        @if (hasPartsToSketchOn()) {
+          <div class="hint">Click a face on a part to sketch on it, or pick a datum plane:</div>
+        } @else {
+          <div class="hint">Pick a plane to sketch on:</div>
+        }
+        <div class="plane-buttons">
+          <button type="button" class="plane-btn" (click)="pickSketchPlane('XY')">XY</button>
+          <button type="button" class="plane-btn" (click)="pickSketchPlane('YZ')">YZ</button>
+          <button type="button" class="plane-btn" (click)="pickSketchPlane('XZ')">XZ</button>
+        </div>
+      }
+
+      @if (sketchState().phase === 'drawing') {
+        <div class="shape-buttons">
+          <button type="button" class="shape-btn" [class.active]="sketchState().shape === 'rectangle'" (click)="setSketchShape('rectangle')" title="Rectangle"><app-icon name="rectangle" [size]="15" /></button>
+          <button type="button" class="shape-btn" [class.active]="sketchState().shape === 'circle'" (click)="setSketchShape('circle')" title="Circle"><app-icon name="circle" [size]="15" /></button>
+          <button type="button" class="shape-btn" [class.active]="sketchState().shape === 'polygon'" (click)="setSketchShape('polygon')" title="Polygon"><app-icon name="polygon" [size]="15" /></button>
+          <button type="button" class="shape-btn" [class.active]="sketchState().shape === 'slot'" (click)="setSketchShape('slot')" title="Slot"><app-icon name="slot" [size]="15" /></button>
+          <button type="button" class="shape-btn" [class.active]="sketchState().shape === 'polyline'" (click)="setSketchShape('polyline')" title="Polyline (freeform, any number of points)"><app-icon name="polyline" [size]="15" /></button>
+        </div>
+
+        @if (sketchState().shape === 'polygon') {
+          <label class="field">Sides<input type="number" min="3" max="20" step="1" [value]="sketchState().param" (input)="onSketchParamChange($event)" /></label>
+        }
+        @if (sketchState().shape === 'slot') {
+          <label class="field">Width (mm)<input type="number" min="0.1" step="1" [value]="sketchState().param" (input)="onSketchParamChange($event)" /></label>
+        }
+
+        <div class="hint">
+          @if (sketchState().shape === 'polyline') {
+            @if (sketchState().points.length === 0) {
+              Click the first point…
+            } @else if (!sketchState().closed) {
+              Click the next point ({{ sketchState().points.length }} so far, min 3) — double-click, press Enter, or click back on the start point to finish…
+            } @else {
+              Profile ready.
+            }
+          } @else if (sketchState().points.length === 0) {
+            @switch (sketchState().shape) {
+              @case ('rectangle') { Click first corner… }
+              @case ('circle') { Click center… }
+              @case ('polygon') { Click center… }
+              @case ('slot') { Click start point… }
+            }
+          } @else if (sketchState().points.length === 1) {
+            @switch (sketchState().shape) {
+              @case ('rectangle') { Click opposite corner… }
+              @case ('circle') { Click to set radius… }
+              @case ('polygon') { Click to set radius… }
+              @case ('slot') { Click end point… }
+            }
+          } @else {
+            Profile ready.
+          }
+        </div>
+
+        @if (sketchState().shape === 'polyline' && !sketchState().closed && sketchState().points.length >= 3) {
+          <button type="button" class="extrude-btn" (click)="closeSketchPolyline()">Finish Polyline ({{ sketchState().points.length }} points)</button>
+        }
+
+        @if (canFinishSketch()) {
+          <div class="kind-toggle">
+            <button type="button" class="kind-btn" [class.active]="sketchFinishMode === 'extrude'" (click)="setSketchFinishMode('extrude')">Extrude</button>
+            <button type="button" class="kind-btn" [class.active]="sketchFinishMode === 'revolve'" (click)="setSketchFinishMode('revolve')">Revolve</button>
+            <button type="button" class="kind-btn" [class.active]="sketchFinishMode === 'sweep'" (click)="setSketchFinishMode('sweep')">Sweep</button>
+          </div>
+
+          @if (sketchFinishMode === 'extrude') {
+            <label class="field">
+              Depth (mm)
+              <input type="number" [value]="sketchDepth" min="0.1" step="1" (input)="onSketchDepthChange($event)" />
+            </label>
+            <label class="field checkbox">
+              <input type="checkbox" [checked]="sketchCut" (change)="onSketchCutChange($event)" />
+              Cut (remove material)
+            </label>
+            <button type="button" class="extrude-btn" [disabled]="sketchBusy()" (click)="extrudeSketch()">
+              {{ sketchBusy() ? 'Extruding…' : 'Extrude' }}
+            </button>
+          } @else if (sketchFinishMode === 'revolve') {
+            <label class="field">
+              Axis
+              <select [value]="sketchRevolveAxis" (change)="onSketchRevolveAxisChange($event)" title="Revolve axis">
+                <option value="u">Sketch plane U axis</option>
+                <option value="v">Sketch plane V axis</option>
+              </select>
+            </label>
+            <label class="field">
+              Angle (°)
+              <input type="number" [value]="sketchRevolveAngle" min="1" max="360" step="1" (input)="onSketchRevolveAngleChange($event)" />
+            </label>
+            <div class="hint">The profile must not cross the axis — draw it entirely to one side.</div>
+            <label class="field checkbox">
+              <input type="checkbox" [checked]="sketchCut" (change)="onSketchCutChange($event)" />
+              Cut (remove material)
+            </label>
+            <div class="hint">Only has an effect if you sketched on an existing part's face — otherwise Revolve always creates a standalone body.</div>
+            <button type="button" class="extrude-btn" [disabled]="sketchBusy()" (click)="revolveSketch()">
+              {{ sketchBusy() ? 'Revolving…' : 'Revolve' }}
+            </button>
+          } @else {
+            <label class="field">
+              Tilt toward
+              <select [value]="sketchSweepAxis" (change)="onSketchSweepAxisChange($event)" title="Sweep tilt axis">
+                <option value="u">Sketch plane U axis</option>
+                <option value="v">Sketch plane V axis</option>
+              </select>
+            </label>
+            <label class="field">
+              Tilt angle (°)
+              <input type="number" [value]="sketchSweepTiltDeg" min="0" max="89" step="1" (input)="onSketchSweepTiltChange($event)" />
+            </label>
+            <label class="field">
+              Distance (mm)
+              <input type="number" [value]="sketchSweepDistance" min="0.1" step="1" (input)="onSketchSweepDistanceChange($event)" />
+            </label>
+            <div class="hint">Sweeps the profile straight, tilted away from the plane's own normal (0° = same as Extrude) toward the chosen axis.</div>
+            <label class="field checkbox">
+              <input type="checkbox" [checked]="sketchCut" (change)="onSketchCutChange($event)" />
+              Cut (remove material)
+            </label>
+            <div class="hint">Only has an effect if you sketched on an existing part's face — otherwise Sweep always creates a standalone body.</div>
+            <button type="button" class="extrude-btn" [disabled]="sketchBusy()" (click)="sweepSketch()">
+              {{ sketchBusy() ? 'Sweeping…' : 'Sweep' }}
+            </button>
+          }
+        }
+      }
+
+      @if (sketchLastError()) {
+        <div class="error">{{ sketchLastError() }}</div>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #structuralTpl let-dock="dock">
+  @if (structuralToolActive() && dockModeFor('structural') === dock) {
+    <div class="structural-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('structural')" [style.top.px]="panelTop('structural')">
+      <div class="panel-title" appPanelDragHandle="structural" (dragMove)="onPanelDragMove('structural', $event)" (dragEnd)="onPanelDragEnd('structural', $event)">
+        Structural Model
+        <button type="button" class="close-btn" (click)="closeStructural()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      <div class="mode-buttons">
+        <button type="button" class="mode-btn" [class.active]="structuralMode() === 'structural-node'" (click)="setStructuralMode('structural-node')">Add Node</button>
+        <button type="button" class="mode-btn" [class.active]="structuralMode() === 'structural-member'" (click)="setStructuralMode('structural-member')">Add Member</button>
+      </div>
+
+      @if (structuralMode() === 'structural-node') {
+        <label class="field">
+          Working plane elevation (Z)
+          <input type="number" [value]="structuralElevation()" step="0.5" (input)="onElevationChange($event)" />
+        </label>
+        <div class="hint">Click the viewport to place a node on this plane.</div>
+      }
+      @if (structuralMode() === 'structural-member') {
+        <div class="hint">Click two existing nodes to connect them with a member.</div>
+      }
+
+      @if (structuralNodes().length > 0) {
+        <div class="section-label">Nodes &amp; Supports</div>
+        <div class="list">
+          @for (node of structuralNodes(); track node.id) {
+            <div class="list-row">
+              <span class="row-label">{{ node.position[0].toFixed(2) }}, {{ node.position[1].toFixed(2) }}, {{ node.position[2].toFixed(2) }}</span>
+              <select (change)="onSupportTypeChange(node.id, $event)">
+                <option value="none" [selected]="supportTypeFor(node.id) === 'none'">No support</option>
+                <option value="pinned" [selected]="supportTypeFor(node.id) === 'pinned'">Pinned</option>
+                <option value="fixed" [selected]="supportTypeFor(node.id) === 'fixed'">Fixed</option>
+              </select>
+            </div>
+          }
+        </div>
+      }
+
+      @if (structuralMembers().length > 0) {
+        <div class="section-label">Members</div>
+        <div class="list">
+          @for (member of structuralMembers(); track member.id) {
+            <div class="list-row"><span class="row-label">{{ member.id }}</span></div>
+          }
+        </div>
+      }
+
+      <div class="section-label">Load Cases</div>
+      <div class="inline-row">
+        <input type="text" [value]="newLoadCaseName" (input)="newLoadCaseName = $any($event.target).value" placeholder="Load case name" />
+        <button type="button" class="small-btn" (click)="addLoadCase()">Add</button>
+      </div>
+
+      @if (structuralLoadCases().length > 0 && structuralMembers().length > 0) {
+        <div class="section-label">Member Load</div>
+        <div class="inline-row">
+          <select (change)="newLoadMemberId = $any($event.target).value">
+            <option value="">Member…</option>
+            @for (member of structuralMembers(); track member.id) {
+              <option [value]="member.id">{{ member.id }}</option>
+            }
+          </select>
+          <select (change)="newLoadCaseId = $any($event.target).value">
+            <option value="">Case…</option>
+            @for (lc of structuralLoadCases(); track lc.id) {
+              <option [value]="lc.id">{{ lc.name }}</option>
+            }
+          </select>
+          <input type="number" [value]="newLoadIntensity" (input)="onIntensityChange($event)" placeholder="N/m" />
+          <button type="button" class="small-btn" (click)="addMemberLoad()">Add</button>
+        </div>
+      }
+
+      @if (structuralLoadCases().length > 1) {
+        <div class="section-label">Load Combination</div>
+        <div class="inline-row">
+          <select (change)="comboFactorCaseId = $any($event.target).value">
+            <option value="">Case…</option>
+            @for (lc of structuralLoadCases(); track lc.id) {
+              <option [value]="lc.id">{{ lc.name }}</option>
+            }
+          </select>
+          <input type="number" [value]="comboFactorValue" step="0.1" (input)="onComboFactorValueChange($event)" />
+          <button type="button" class="small-btn" (click)="addComboFactor()">Add Factor</button>
+        </div>
+        @for (f of pendingComboFactors; track $index) {
+          <div class="list-row">
+            <span class="row-label">{{ f.factor }} × {{ loadCaseName(f.loadCaseId) }}</span>
+            <button type="button" class="small-btn" (click)="removeComboFactor($index)" title="Remove" aria-label="Remove"><app-icon name="close" [size]="10" /></button>
+          </div>
+        }
+        <div class="inline-row">
+          <input type="text" [value]="newComboName" (input)="newComboName = $any($event.target).value" placeholder="Combination name" />
+          <button type="button" class="small-btn" (click)="saveCombination()">Save Combo</button>
+        </div>
+      }
+
+      @if (structuralNodes().length > 0 && structuralMembers().length > 0) {
+        <button type="button" class="analyze-btn" (click)="runAnalysis()">Run Analysis</button>
+      }
+
+      @if (structuralSolverError()) {
+        <div class="error">{{ structuralSolverError() }}</div>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #resultsTpl let-dock="dock">
+  @if (hasResults() && dockModeFor('results') === dock) {
+    <div class="results-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('results')" [style.top.px]="panelTop('results')">
+      <div class="panel-title" appPanelDragHandle="results" (dragMove)="onPanelDragMove('results', $event)" (dragEnd)="onPanelDragEnd('results', $event)">
+        Analysis Results
+        <button type="button" class="close-btn" (click)="clearStructuralResults()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      <label class="field">
+        Result
+        <select (change)="onResultChange($event)">
+          <option value="">Select…</option>
+          @for (r of structuralResults(); track r.resultId) {
+            <option [value]="r.resultId">{{ r.resultId }} ({{ r.resultKind }})</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        Display
+        <select (change)="onResultsModeChange($event)">
+          <option value="none">None</option>
+          <option value="deflection">Deflected Shape</option>
+          <option value="reactions">Reactions</option>
+          <option value="moment">Bending Moment</option>
+          <option value="shear">Shear Force</option>
+          <option value="axial">Axial Force</option>
+          <option value="torsion">Torsion</option>
+        </select>
+      </label>
+
+      @if (resultsDisplayMode() === 'deflection') {
+        <label class="field">
+          Scale ({{ resultsDeflectionScale() }}×)
+          <input type="range" min="1" max="200" step="1" [value]="resultsDeflectionScale()" (input)="onResultsScaleChange($event)" />
+        </label>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #bridgeTpl let-dock="dock">
+  @if (bridgeMeshToolActive() && dockModeFor('bridge') === dock) {
+    <div class="bridge-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('bridge')" [style.top.px]="panelTop('bridge')">
+      <div class="panel-title" appPanelDragHandle="bridge" (dragMove)="onPanelDragMove('bridge', $event)" (dragEnd)="onPanelDragEnd('bridge', $event)">
+        Bridge Mesh
+        <button type="button" class="close-btn" (click)="closeBridgeMesh()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      @if (!bridgeFirstPick()) {
+        <div class="hint">Click a face on the first part…</div>
+      } @else if (!bridgeSecondPick()) {
+        <div class="hint">Now click a face on a different part…</div>
+      } @else {
+        <div class="hint">Bridge generated. Adjust density or clear to pick again.</div>
+        <label class="field">
+          Density ({{ bridgeDensity() }} rows)
+          <input type="range" min="1" max="30" step="1" [value]="bridgeDensity()" (input)="onBridgeDensityChange($event)" />
+        </label>
+      }
+
+      @if (bridgeErrorMessage()) {
+        <div class="error">{{ bridgeErrorMessage() }}</div>
+      }
+
+      @if (bridgeFirstPick()) {
+        <button type="button" class="clear-btn" (click)="clearBridgeMesh()">Clear</button>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #primitiveTpl let-dock="dock">
+  @if (primitiveToolActive() && dockModeFor('primitive') === dock) {
+    <div class="primitive-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('primitive')" [style.top.px]="panelTop('primitive')">
+      <div class="panel-title" appPanelDragHandle="primitive" (dragMove)="onPanelDragMove('primitive', $event)" (dragEnd)="onPanelDragEnd('primitive', $event)">
+        Add {{ primitiveState().kind[0].toUpperCase() + primitiveState().kind.slice(1) }}
+        <button type="button" class="close-btn" (click)="closePrimitiveTool()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      @if (primitiveState().phase === 'picking-point') {
+        <div class="hint">Click the viewport to place the base point…</div>
+      }
+
+      @if (primitiveState().phase === 'configuring') {
+        @switch (primitiveState().kind) {
+          @case ('box') {
+            <label class="field">Width (mm)<input type="number" min="0.1" step="1" [value]="primitiveDimensions().width" (input)="onDimensionChange('width', $event)" /></label>
+            <label class="field">Depth (mm)<input type="number" min="0.1" step="1" [value]="primitiveDimensions().depth" (input)="onDimensionChange('depth', $event)" /></label>
+            <label class="field">Height (mm)<input type="number" min="0.1" step="1" [value]="primitiveDimensions().height" (input)="onDimensionChange('height', $event)" /></label>
+          }
+          @case ('cylinder') {
+            <label class="field">Radius (mm)<input type="number" min="0.1" step="1" [value]="primitiveDimensions().radius" (input)="onDimensionChange('radius', $event)" /></label>
+            <label class="field">Height (mm)<input type="number" min="0.1" step="1" [value]="primitiveDimensions().height" (input)="onDimensionChange('height', $event)" /></label>
+          }
+          @case ('sphere') {
+            <label class="field">Radius (mm)<input type="number" min="0.1" step="1" [value]="primitiveDimensions().radius" (input)="onDimensionChange('radius', $event)" /></label>
+          }
+          @case ('cone') {
+            <label class="field">Base radius (mm)<input type="number" min="0" step="1" [value]="primitiveDimensions().radius1" (input)="onDimensionChange('radius1', $event)" /></label>
+            <label class="field">Top radius (mm)<input type="number" min="0" step="1" [value]="primitiveDimensions().radius2" (input)="onDimensionChange('radius2', $event)" /></label>
+            <label class="field">Height (mm)<input type="number" min="0.1" step="1" [value]="primitiveDimensions().height" (input)="onDimensionChange('height', $event)" /></label>
+          }
+        }
+
+        <div class="inline-row">
+          <button type="button" class="clear-btn" (click)="cancelPrimitivePlacement()">Back</button>
+          <button type="button" class="extrude-btn" [disabled]="primitiveBusy()" (click)="createPrimitive()">
+            {{ primitiveBusy() ? 'Creating…' : 'Create' }}
+          </button>
+        </div>
+      }
+
+      @if (primitiveError()) {
+        <div class="error">{{ primitiveError() }}</div>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #filletChamferTpl let-dock="dock">
+  @if (filletChamferToolActive() && dockModeFor('filletChamfer') === dock) {
+    <div class="fillet-chamfer-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('filletChamfer')" [style.top.px]="panelTop('filletChamfer')">
+      <div class="panel-title" appPanelDragHandle="filletChamfer" (dragMove)="onPanelDragMove('filletChamfer', $event)" (dragEnd)="onPanelDragEnd('filletChamfer', $event)">
+        Fillet / Chamfer
+        <button type="button" class="close-btn" (click)="closeFilletChamfer()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      <div class="kind-toggle">
+        <button type="button" class="kind-btn" [class.active]="filletChamferState().kind === 'fillet'" (click)="setFilletChamferKind('fillet')">Fillet</button>
+        <button type="button" class="kind-btn" [class.active]="filletChamferState().kind === 'chamfer'" (click)="setFilletChamferKind('chamfer')">Chamfer</button>
+      </div>
+
+      <div class="hint">
+        {{ filletChamferState().picks.length === 0 ? 'Click one or more edges on a part…' : (filletChamferState().picks.length + ' edge' + (filletChamferState().picks.length === 1 ? '' : 's') + ' selected — click more, or set each edge\'s value below.') }}
+      </div>
+
+      @if (filletChamferState().picks.length > 0) {
+        <ul class="pick-list">
+          @for (pick of filletChamferState().picks; track pick.edgeIndex) {
+            <li>
+              Edge {{ pick.edgeIndex }}
+              <input
+                type="number"
+                class="edge-value-input"
+                min="0.1"
+                step="0.5"
+                [value]="pick.value"
+                aria-label="Radius or distance for this edge (mm)"
+                [title]="filletChamferState().kind === 'fillet' ? 'Radius (mm)' : 'Distance (mm)'"
+                (input)="onFilletChamferEdgeValueChange(pick.bodyId, pick.edgeIndex, $event)"
+              />
+              <button type="button" class="close-btn" (click)="removeFilletChamferPick(pick.bodyId, pick.edgeIndex)" title="Remove" aria-label="Remove edge"><app-icon name="close" [size]="10" /></button>
+            </li>
+          }
+        </ul>
+
+        <label class="field">
+          New edges start at ({{ filletChamferState().kind === 'fillet' ? 'radius' : 'distance' }}, mm)
+          <input type="number" min="0.1" step="0.5" [value]="filletChamferState().defaultValue" (input)="onFilletChamferDefaultValueChange($event)" />
+        </label>
+        <div class="hint">Each picked edge above has its own value — change one without affecting the others.</div>
+
+        <div class="inline-row">
+          <button type="button" class="extrude-btn" [disabled]="filletChamferBusy()" (click)="commitFilletChamfer()">
+            {{ filletChamferBusy() ? 'Applying…' : (filletChamferState().kind === 'fillet' ? 'Apply Fillet' : 'Apply Chamfer') }}
+          </button>
+        </div>
+      }
+
+      @if (filletChamferError()) {
+        <div class="error">{{ filletChamferError() }}</div>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #patternTpl let-dock="dock">
+  @if (patternToolActive() && dockModeFor('pattern') === dock) {
+    <div class="pattern-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('pattern')" [style.top.px]="panelTop('pattern')">
+      <div class="panel-title" appPanelDragHandle="pattern" (dragMove)="onPanelDragMove('pattern', $event)" (dragEnd)="onPanelDragEnd('pattern', $event)">
+        Pattern
+        <button type="button" class="close-btn" (click)="closePattern()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      <div class="kind-toggle">
+        <button type="button" class="kind-btn" [class.active]="patternState().kind === 'linear'" (click)="setPatternKind('linear')">Linear</button>
+        <button type="button" class="kind-btn" [class.active]="patternState().kind === 'circular'" (click)="setPatternKind('circular')">Circular</button>
+      </div>
+
+      <div class="hint">Target: {{ patternTargetName() }}</div>
+
+      <label class="field">
+        {{ patternState().kind === 'linear' ? 'Direction' : 'Axis' }}
+        <select [value]="patternState().axis" (change)="onPatternAxisChange($event)" title="Pattern axis">
+          @for (axis of patternAxes; track axis) {
+            <option [value]="axis">{{ axis.toUpperCase() }}</option>
+          }
+        </select>
+      </label>
+
+      @if (patternState().kind === 'linear') {
+        <label class="field">
+          Spacing (mm)
+          <input type="number" step="1" [value]="patternState().spacing" (input)="onPatternSpacingChange($event)" />
+        </label>
+      } @else {
+        <label class="field">
+          Total angle (°)
+          <input type="number" step="1" [value]="patternState().totalAngle" (input)="onPatternAngleChange($event)" />
+        </label>
+      }
+
+      <label class="field">
+        Count (incl. original)
+        <input type="number" min="2" step="1" [value]="patternState().count" (input)="onPatternCountChange($event)" />
+      </label>
+
+      <div class="inline-row">
+        <button type="button" class="extrude-btn" [disabled]="!canCommitPattern()" (click)="applyPattern()">Apply Pattern</button>
+      </div>
+
+      @if (patternError()) {
+        <div class="error">{{ patternError() }}</div>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #mirrorTpl let-dock="dock">
+  @if (mirrorToolActive() && dockModeFor('mirror') === dock) {
+    <div class="mirror-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('mirror')" [style.top.px]="panelTop('mirror')">
+      <div class="panel-title" appPanelDragHandle="mirror" (dragMove)="onPanelDragMove('mirror', $event)" (dragEnd)="onPanelDragEnd('mirror', $event)">
+        Mirror
+        <button type="button" class="close-btn" (click)="closeMirror()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      <div class="hint">Target: {{ mirrorTargetName() }}</div>
+
+      <label class="field">
+        Mirror plane
+        <select [value]="mirrorState().plane" (change)="onMirrorPlaneChange($event)" title="Mirror plane">
+          @for (plane of mirrorPlanes; track plane) {
+            <option [value]="plane">{{ plane }}</option>
+          }
+        </select>
+      </label>
+
+      <div class="inline-row">
+        <button type="button" class="extrude-btn" [disabled]="!canCommitMirror()" (click)="applyMirror()">Apply Mirror</button>
+      </div>
+
+      @if (mirrorError()) {
+        <div class="error">{{ mirrorError() }}</div>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #holeWizardTpl let-dock="dock">
+  @if (holeWizardActive() && dockModeFor('holeWizard') === dock) {
+    <div class="hole-wizard-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('holeWizard')" [style.top.px]="panelTop('holeWizard')">
+      <div class="panel-title" appPanelDragHandle="holeWizard" (dragMove)="onPanelDragMove('holeWizard', $event)" (dragEnd)="onPanelDragEnd('holeWizard', $event)">
+        Hole Wizard
+        <button type="button" class="close-btn" (click)="closeHoleWizard()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      @if (holeWizardPhase() === 'picking-face') {
+        <div class="hint">Click a flat face on a STEP-imported part…</div>
+      }
+
+      @if (holeWizardPhase() === 'picking-point') {
+        <div class="hint">Click where the hole should be centered…</div>
+      }
+
+      @if (holeWizardPhase() === 'configuring') {
+        <label class="field">
+          Standard
+          <select [value]="holeWizardState().standard" (change)="onHoleWizardStandardChange($event)" title="Fastener standard">
+            <option value="metric">Metric</option>
+            <option value="inch">Inch</option>
+          </select>
+        </label>
+
+        <label class="field">
+          Size
+          <select [value]="holeWizardState().presetIndex" (change)="onHoleWizardPresetChange($event)" title="Fastener size">
+            @for (preset of holeWizardPresets(); track preset.label; let i = $index) {
+              <option [value]="i">{{ preset.label }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="field">
+          Fit
+          <select [value]="holeWizardState().fit" (change)="onHoleWizardFitChange($event)" title="Clearance fit">
+            <option value="close">Close</option>
+            <option value="normal">Normal</option>
+            <option value="loose">Loose</option>
+          </select>
+        </label>
+
+        <div class="hint">Hole diameter: {{ holeWizardDiameter().toFixed(2) }} mm (through-hole)</div>
+
+        <div class="inline-row">
+          <button type="button" class="extrude-btn" [disabled]="!canCommitHoleWizard() || holeWizardBusy()" (click)="applyHoleWizard()">
+            {{ holeWizardBusy() ? 'Cutting…' : 'Apply Hole' }}
+          </button>
+        </div>
+      }
+
+      @if (holeWizardError()) {
+        <div class="error">{{ holeWizardError() }}</div>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #referencePlaneTpl let-dock="dock">
+  @if (referencePlaneToolActive() && dockModeFor('referencePlane') === dock) {
+    <div class="reference-plane-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('referencePlane')" [style.top.px]="panelTop('referencePlane')">
+      <div class="panel-title" appPanelDragHandle="referencePlane" (dragMove)="onPanelDragMove('referencePlane', $event)" (dragEnd)="onPanelDragEnd('referencePlane', $event)">
+        Reference Plane
+        <button type="button" class="close-btn" (click)="closeReferencePlane()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      @if (!referencePlaneToolState().base) {
+        <div class="hint">Pick a datum plane, or click a face on a part, as the base to offset from:</div>
+        <div class="plane-buttons">
+          @for (plane of referencePlaneDatums; track plane) {
+            <button type="button" class="plane-btn" (click)="pickReferencePlaneDatum(plane)">{{ plane }}</button>
+          }
+        </div>
+      } @else {
+        <div class="hint">Base: {{ referencePlaneBaseLabel() }} <button type="button" class="link-btn" (click)="restartReferencePlanePick()">change</button></div>
+
+        <label class="field">
+          Offset (mm)
+          <input type="number" step="1" [value]="referencePlaneToolState().offset" (input)="onReferencePlaneOffsetChange($event)" />
+        </label>
+
+        <label class="field">
+          Name (optional)
+          <input type="text" [value]="referencePlaneToolState().name" placeholder="Plane 1" (input)="onReferencePlaneNameChange($event)" />
+        </label>
+
+        <div class="inline-row">
+          <button type="button" class="extrude-btn" [disabled]="!canCommitReferencePlane()" (click)="applyReferencePlane()">Create Plane</button>
+        </div>
+      }
+
+      @if (referencePlaneError()) {
+        <div class="error">{{ referencePlaneError() }}</div>
+      }
+
+      @if (storedReferencePlanes().length > 0) {
+        <div class="reference-plane-list">
+          <div class="hint">Reference planes:</div>
+          @for (plane of storedReferencePlanes(); track plane.id) {
+            <div class="reference-plane-row">
+              <input class="node-rename-input" type="text" [value]="plane.name" title="Plane name" (change)="renameReferencePlane(plane, $event)" />
+              <button type="button" class="icon-btn" title="Toggle visibility" (click)="toggleReferencePlaneVisible(plane)"><app-icon [name]="plane.visible ? 'eye' : 'eye-off'" [size]="13" /></button>
+              <button type="button" class="icon-btn" title="Sketch on this plane" (click)="sketchOnReferencePlane(plane)"><app-icon name="rectangle" [size]="13" /></button>
+              <button type="button" class="icon-btn" title="Delete plane" (click)="deleteReferencePlane(plane)"><app-icon name="trash" [size]="13" /></button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #shellTpl let-dock="dock">
+  @if (shellToolActive() && dockModeFor('shell') === dock) {
+    <div class="shell-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('shell')" [style.top.px]="panelTop('shell')">
+      <div class="panel-title" appPanelDragHandle="shell" (dragMove)="onPanelDragMove('shell', $event)" (dragEnd)="onPanelDragEnd('shell', $event)">
+        Shell
+        <button type="button" class="close-btn" (click)="closeShell()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      <div class="hint">
+        {{ shellState().picks.length === 0 ? 'Click one or more faces to remove…' : (shellState().picks.length + ' face' + (shellState().picks.length === 1 ? '' : 's') + ' selected — click more, or set a thickness below.') }}
+      </div>
+
+      @if (shellState().picks.length > 0) {
+        <ul class="pick-list">
+          @for (pick of shellState().picks; track pick.faceIndex) {
+            <li>
+              Face {{ pick.faceIndex }}
+              <button type="button" class="close-btn" (click)="removeShellPick(pick.bodyId, pick.faceIndex)" title="Remove" aria-label="Remove face"><app-icon name="close" [size]="10" /></button>
+            </li>
+          }
+        </ul>
+
+        <label class="field">
+          Wall thickness (mm)
+          <input type="number" min="0.1" step="0.5" [value]="shellState().thickness" (input)="onShellThicknessChange($event)" />
+        </label>
+
+        <div class="inline-row">
+          <button type="button" class="extrude-btn" [disabled]="!canCommitShell() || shellBusy()" (click)="commitShell()">
+            {{ shellBusy() ? 'Applying…' : 'Apply Shell' }}
+          </button>
+        </div>
+      }
+
+      @if (shellError()) {
+        <div class="error">{{ shellError() }}</div>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #draftTpl let-dock="dock">
+  @if (draftToolActive() && dockModeFor('draft') === dock) {
+    <div class="draft-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('draft')" [style.top.px]="panelTop('draft')">
+      <div class="panel-title" appPanelDragHandle="draft" (dragMove)="onPanelDragMove('draft', $event)" (dragEnd)="onPanelDragEnd('draft', $event)">
+        Draft
+        <button type="button" class="close-btn" (click)="closeDraft()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      <div class="hint">
+        {{ draftState().picks.length === 0 ? 'Click one or more faces to draft…' : (draftState().picks.length + ' face' + (draftState().picks.length === 1 ? '' : 's') + ' selected — click more, or set an angle below.') }}
+      </div>
+
+      @if (draftState().picks.length > 0) {
+        <ul class="pick-list">
+          @for (pick of draftState().picks; track pick.faceIndex) {
+            <li>
+              Face {{ pick.faceIndex }}
+              <button type="button" class="close-btn" (click)="removeDraftPick(pick.bodyId, pick.faceIndex)" title="Remove" aria-label="Remove face"><app-icon name="close" [size]="10" /></button>
+            </li>
+          }
+        </ul>
+
+        <label class="field">
+          Draft angle (°)
+          <input type="number" min="0.5" max="89" step="0.5" [value]="draftState().angleDeg" (input)="onDraftAngleChange($event)" />
+        </label>
+        <div class="hint">Pulled along world +Z, from the world XY plane.</div>
+
+        <div class="inline-row">
+          <button type="button" class="extrude-btn" [disabled]="!canCommitDraft() || draftBusy()" (click)="commitDraft()">
+            {{ draftBusy() ? 'Applying…' : 'Apply Draft' }}
+          </button>
+        </div>
+      }
+
+      @if (draftError()) {
+        <div class="error">{{ draftError() }}</div>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #loftTpl let-dock="dock">
+  @if (loftToolActive() && dockModeFor('loft') === dock) {
+    <div class="loft-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('loft')" [style.top.px]="panelTop('loft')">
+      <div class="panel-title" appPanelDragHandle="loft" (dragMove)="onPanelDragMove('loft', $event)" (dragEnd)="onPanelDragEnd('loft', $event)">
+        Loft
+        <button type="button" class="close-btn" (click)="closeLoft()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      @if (loftState().profiles.length > 0) {
+        <ul class="pick-list">
+          @for (profile of loftState().profiles; track profile.sketchId) {
+            <li>
+              {{ profile.label }}
+              <button type="button" class="close-btn" (click)="removeLoftProfile(profile.sketchId)" title="Remove" aria-label="Remove profile"><app-icon name="close" [size]="10" /></button>
+            </li>
+          }
+        </ul>
+      }
+
+      @if (loftSketchPhase() === 'picking-plane' || loftSketchPhase() === 'picking-face') {
+        <div class="hint">
+          {{ loftState().profiles.length === 0 ? 'Pick a plane for the first profile:' : 'Pick a plane for the next profile:' }}
+        </div>
+        <div class="plane-buttons">
+          <button type="button" class="plane-btn" (click)="pickSketchPlane('XY')">XY</button>
+          <button type="button" class="plane-btn" (click)="pickSketchPlane('YZ')">YZ</button>
+          <button type="button" class="plane-btn" (click)="pickSketchPlane('XZ')">XZ</button>
+        </div>
+      }
+
+      @if (loftSketchPhase() === 'drawing') {
+        <div class="shape-buttons">
+          <button type="button" class="shape-btn" [class.active]="sketchState().shape === 'rectangle'" (click)="setSketchShape('rectangle')" title="Rectangle"><app-icon name="rectangle" [size]="15" /></button>
+          <button type="button" class="shape-btn" [class.active]="sketchState().shape === 'circle'" (click)="setSketchShape('circle')" title="Circle"><app-icon name="circle" [size]="15" /></button>
+          <button type="button" class="shape-btn" [class.active]="sketchState().shape === 'polygon'" (click)="setSketchShape('polygon')" title="Polygon"><app-icon name="polygon" [size]="15" /></button>
+          <button type="button" class="shape-btn" [class.active]="sketchState().shape === 'slot'" (click)="setSketchShape('slot')" title="Slot"><app-icon name="slot" [size]="15" /></button>
+          <button type="button" class="shape-btn" [class.active]="sketchState().shape === 'polyline'" (click)="setSketchShape('polyline')" title="Polyline (freeform, any number of points)"><app-icon name="polyline" [size]="15" /></button>
+        </div>
+
+        @if (sketchState().shape === 'polygon') {
+          <label class="field">Sides<input type="number" min="3" max="20" step="1" [value]="sketchState().param" (input)="onSketchParamChange($event)" /></label>
+        }
+        @if (sketchState().shape === 'slot') {
+          <label class="field">Width (mm)<input type="number" min="0.1" step="1" [value]="sketchState().param" (input)="onSketchParamChange($event)" /></label>
+        }
+
+        <div class="hint">
+          @if (sketchState().shape === 'polyline') {
+            @if (sketchState().points.length === 0) {
+              Click the first point…
+            } @else if (!sketchState().closed) {
+              Click the next point ({{ sketchState().points.length }} so far, min 3) — double-click, press Enter, or click back on the start point to finish…
+            } @else {
+              Profile ready.
+            }
+          } @else if (sketchState().points.length === 0) {
+            @switch (sketchState().shape) {
+              @case ('rectangle') { Click first corner… }
+              @case ('circle') { Click center… }
+              @case ('polygon') { Click center… }
+              @case ('slot') { Click start point… }
+            }
+          } @else if (sketchState().points.length === 1) {
+            @switch (sketchState().shape) {
+              @case ('rectangle') { Click opposite corner… }
+              @case ('circle') { Click to set radius… }
+              @case ('polygon') { Click to set radius… }
+              @case ('slot') { Click end point… }
+            }
+          } @else {
+            Profile ready.
+          }
+        </div>
+
+        @if (sketchState().shape === 'polyline' && !sketchState().closed && sketchState().points.length >= 3) {
+          <button type="button" class="extrude-btn" (click)="closeSketchPolyline()">Finish Polyline ({{ sketchState().points.length }} points)</button>
+        }
+
+        <button type="button" class="extrude-btn" [disabled]="!canAddLoftProfile() || loftBusy()" (click)="addLoftProfile()">
+          Add to Loft
+        </button>
+      }
+
+      @if (canFinishLoft()) {
+        <div class="hint">{{ loftState().profiles.length }} profiles ready — add more, or finish the Loft.</div>
+        <label class="field checkbox">
+          <input type="checkbox" [checked]="loftCut" (change)="onLoftCutChange($event)" />
+          Cut (remove material)
+        </label>
+        <div class="hint">Only has an effect if your FIRST profile was sketched on an existing part's face — otherwise Loft always creates a standalone body.</div>
+        <button type="button" class="extrude-btn" [disabled]="loftBusy()" (click)="finishLoft()">
+          {{ loftBusy() ? 'Lofting…' : 'Finish Loft' }}
+        </button>
+      }
+
+      @if (loftError()) {
+        <div class="error">{{ loftError() }}</div>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #featureTreeTpl let-dock="dock">
+  @if (featureTreeOpen() && dockModeFor('featureTree') === dock) {
+    <div class="feature-tree-panel floating-panel" [class.docked-left]="dock === 'docked-left'" [class.docked-right]="dock === 'docked-right'" [style.left.px]="panelLeft('featureTree')" [style.top.px]="panelTop('featureTree')">
+      <div class="panel-title" appPanelDragHandle="featureTree" (dragMove)="onPanelDragMove('featureTree', $event)" (dragEnd)="onPanelDragEnd('featureTree', $event)">
+        Feature Tree
+        <button type="button" class="close-btn" (click)="closeFeatureTree()" title="Close" aria-label="Close"><app-icon name="close" [size]="11" /></button>
+      </div>
+
+      @if (featureTreeEntries().length === 0) {
+        <div class="hint">No editable features yet — extrude a sketch to create one.</div>
+      } @else {
+        <ul class="pick-list">
+          @for (feature of featureTreeEntries(); track feature.featureId) {
+            <li [class.active]="featureTreeEditingId() === feature.featureId">
+              @if (featureTreeEditingId() === feature.featureId) {
+                <div class="feature-edit-form">
+                  <div class="feature-edit-title">{{ feature.label }}</div>
+                  @switch (feature.kind) {
+                    @case ('extrude') {
+                      <label class="field">Depth (mm)<input type="number" min="0.01" step="1" [value]="featureEditDepth" (input)="onFeatureEditDepthChange($event)" /></label>
+                    }
+                    @case ('revolve') {
+                      <label class="field">Axis
+                        <select (change)="onFeatureEditAxisChange($event)">
+                          <option value="u" [selected]="featureEditAxis === 'u'">U</option>
+                          <option value="v" [selected]="featureEditAxis === 'v'">V</option>
+                        </select>
+                      </label>
+                      <label class="field">Angle (°)<input type="number" min="1" max="360" step="1" [value]="featureEditAngle" (input)="onFeatureEditAngleChange($event)" /></label>
+                    }
+                    @case ('sweep') {
+                      <label class="field">Tilt toward
+                        <select (change)="onFeatureEditAxisChange($event)">
+                          <option value="u" [selected]="featureEditAxis === 'u'">Sketch plane U axis</option>
+                          <option value="v" [selected]="featureEditAxis === 'v'">Sketch plane V axis</option>
+                        </select>
+                      </label>
+                      <label class="field">Tilt angle (°)<input type="number" min="0" max="89" step="1" [value]="featureEditTiltDeg" (input)="onFeatureEditTiltDegChange($event)" /></label>
+                      <label class="field">Distance (mm)<input type="number" min="0.01" step="1" [value]="featureEditDistance" (input)="onFeatureEditDistanceChange($event)" /></label>
+                    }
+                    @case ('loft') {
+                      <!-- v1 Loft editing is Cut-only (shared checkbox below) — no profile-level fields; see FeatureRecord's own docstring for the scoping rationale. -->
+                    }
+                    @case ('filletChamfer') {
+                      <!-- No cut/fuse checkbox — fillet/chamfer isn't a cut-or-add choice, it directly modifies the target solid's edges. Edge SET is fixed at creation; only each already-picked edge's own value is editable here, same restriction Loft's own profile set has. -->
+                      <div class="field">{{ featureEditFilletChamferKind === 'fillet' ? 'Fillet radii' : 'Chamfer distances' }} (mm)</div>
+                      @for (edge of featureEditEdges; track edge.edgeIndex) {
+                        <label class="field">Edge {{ edge.edgeIndex }}
+                          <input type="number" min="0.1" step="0.5" [value]="edge.value" (input)="onFeatureEditEdgeValueChange(edge.edgeIndex, $event)" />
+                        </label>
+                      }
+                    }
+                  }
+                  @if (feature.kind !== 'filletChamfer') {
+                    <label class="field checkbox">
+                      <input type="checkbox" [checked]="featureEditCut" (change)="onFeatureEditCutChange($event)" />
+                      Cut (remove material)
+                    </label>
+                  }
+                  @if (featureEditError()) {
+                    <div class="error">{{ featureEditError() }}</div>
+                  }
+                  <div class="feature-edit-actions">
+                    <button type="button" class="extrude-btn" [disabled]="featureEditBusy()" (click)="applyFeatureEdit()">
+                      {{ featureEditBusy() ? 'Applying…' : 'Apply' }}
+                    </button>
+                    <button type="button" class="cancel-btn" [disabled]="featureEditBusy()" (click)="cancelEditFeature()">Cancel</button>
+                  </div>
+                </div>
+              } @else {
+                <button type="button" class="feature-row-btn" (dblclick)="beginEditFeature(feature.featureId)" title="Double-click to edit">
+                  @switch (feature.kind) {
+                    @case ('extrude') {
+                      {{ feature.label }} — {{ feature.params.depth }}mm{{ feature.params.cut ? ' (cut)' : '' }}
+                    }
+                    @case ('revolve') {
+                      {{ feature.label }} — {{ feature.params.angleDeg }}°{{ feature.params.cut ? ' (cut)' : '' }}
+                    }
+                    @case ('sweep') {
+                      {{ feature.label }} — {{ feature.params.tiltDeg }}° tilt, {{ feature.params.distance }}mm{{ feature.params.cut ? ' (cut)' : '' }}
+                    }
+                    @case ('loft') {
+                      {{ feature.label }} — {{ feature.sketchIds.length }} profiles{{ feature.params.cut ? ' (cut)' : '' }}
+                    }
+                    @case ('filletChamfer') {
+                      {{ feature.label }} — {{ feature.params.edges.length }} edge{{ feature.params.edges.length === 1 ? '' : 's' }}
+                    }
+                  }
+                </button>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  }
+</ng-template>

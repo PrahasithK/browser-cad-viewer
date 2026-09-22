@@ -1,0 +1,202 @@
+<div class="model-tree">
+  <div class="tree-header">Model Tree</div>
+  <div class="tree-filter-row">
+    <input
+      class="tree-filter-input"
+      type="text"
+      placeholder="Filter parts…"
+      title="Filter model tree by name"
+      [value]="treeFilter()"
+      (input)="onFilterInput($event)"
+      (keydown.escape)="clearFilter()"
+    />
+  </div>
+  <div class="tree-body">
+    @for (assembly of nodes(); track assembly.id) {
+      <ng-container *ngTemplateOutlet="nodeTpl; context: { $implicit: assembly, depth: 0 }"></ng-container>
+    }
+    @if (nodes().length === 0) {
+      <div class="empty-state">No model loaded</div>
+    }
+  </div>
+  <div
+    class="resize-handle resize-handle-tree"
+    (pointerdown)="onTreeResizeStart($event)"
+    (pointermove)="onTreeResizeMove($event)"
+    (pointerup)="onTreeResizeEnd()"
+  ></div>
+</div>
+
+<ng-template #nodeTpl let-node let-depth="depth">
+  @if (isVisibleUnderFilter(node)) {
+    <div
+      class="tree-node"
+      [class.selected]="isSelected(node)"
+      [style.padding-left.px]="depth * 16 + 8"
+      (click)="select(node, $event)"
+      (dblclick)="startRename(node, $event)"
+      title="Ctrl/Shift-click to multi-select"
+    >
+      @if (node.children.length > 0) {
+        <span class="expand-icon" (click)="toggleExpand(node, $event)"><app-icon [name]="node.expanded ? 'chevron-down' : 'chevron-right'" [size]="11" /></span>
+      } @else {
+        <span class="expand-icon spacer"></span>
+      }
+      <span class="node-icon"><app-icon [name]="node.type === 'assembly' ? 'folder' : node.type === 'import' ? 'package' : 'body'" [size]="13" /></span>
+      @if (isRenaming(node)) {
+        <input
+          class="node-rename-input"
+          type="text"
+          [value]="node.label"
+          title="Part name"
+          (click)="$event.stopPropagation()"
+          (keydown.enter)="commitRename(node, $event)"
+          (keydown.escape)="cancelRename($event)"
+          (blur)="commitRename(node, $event)"
+        />
+      } @else {
+        <span class="node-label">{{ node.label }}</span>
+      }
+      @if (node.type === 'body') {
+        <span class="visibility-toggle" title="Toggle visibility" (click)="toggleVisibility(node, $event)"><app-icon [name]="node.visible ? 'eye' : 'eye-off'" [size]="13" /></span>
+        <span class="delete-toggle" title="Delete part" (click)="requestDelete(node, $event)"><app-icon name="trash" [size]="13" /></span>
+      }
+    </div>
+  }
+  @if (node.expanded) {
+    @for (child of node.children; track child.id) {
+      <ng-container *ngTemplateOutlet="nodeTpl; context: { $implicit: child, depth: depth + 1 }"></ng-container>
+    }
+  }
+</ng-template>
+
+<div class="properties-panel">
+  <div
+    class="resize-handle resize-handle-properties"
+    (pointerdown)="onPropertiesResizeStart($event)"
+    (pointermove)="onPropertiesResizeMove($event)"
+    (pointerup)="onPropertiesResizeEnd()"
+  ></div>
+  <div class="panel-header" [class.flash]="propertiesFlash()">Properties</div>
+
+  @if (snapshot(); as snap) {
+    <div class="panel-body">
+      <div class="prop-section">
+        <div class="prop-row">
+          <span class="prop-label">Name</span>
+          @if (editingName()) {
+            <input
+              class="name-edit-input"
+              type="text"
+              [value]="snap.body.name"
+              title="Part name"
+              (keydown.enter)="commitNameEdit($event)"
+              (keydown.escape)="cancelNameEdit()"
+              (blur)="commitNameEdit($event)"
+            />
+          } @else {
+            <span class="prop-value editable" title="Click to rename" (click)="startNameEdit()">{{ snap.body.name }}</span>
+          }
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Visible</span>
+          <input type="checkbox" title="Visible" [checked]="snap.body.visible" (change)="onVisibilityChange($event)" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Color</span>
+          <input type="color" title="Body color" [value]="snap.material.color" (input)="onColorChange($event)" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Opacity</span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            title="Opacity"
+            [value]="snap.material.opacity"
+            (input)="onOpacityChange($event)"
+          />
+        </div>
+      </div>
+
+      <div class="prop-section">
+        <div class="section-title">Geometry</div>
+        <div class="prop-row">
+          <span class="prop-label">Volume</span>
+          <span class="prop-value">{{ formatVolume(snap.body.volume) }}</span>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Surface Area</span>
+          <span class="prop-value">{{ formatArea(snap.body.surfaceArea) }}</span>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Faces</span>
+          <span class="prop-value">{{ snap.body.faceCount }}</span>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Edges</span>
+          <span class="prop-value">{{ snap.body.edgeCount }}</span>
+        </div>
+      </div>
+
+      <div class="prop-section">
+        <div class="section-title">Mass Properties</div>
+        <div class="prop-row">
+          <span class="prop-label">Material</span>
+          <select class="prop-select" title="Material (sets density for mass properties)" (change)="onMaterialChange($event)">
+            <option value="" [selected]="!snap.engineeringMaterial">None</option>
+            @for (m of materials; track m.id) {
+              <option [value]="m.id" [selected]="snap.engineeringMaterial?.id === m.id">{{ m.name }}</option>
+            }
+          </select>
+        </div>
+        @for (row of massRows(snap); track row.label) {
+          <div class="prop-row">
+            <span class="prop-label">{{ row.label }}</span>
+            <span class="prop-value small">{{ row.value }}</span>
+          </div>
+        }
+        @if (!snap.engineeringMaterial) {
+          <div class="prop-hint">Assign a material to get mass and moments of inertia.</div>
+        } @else {
+          <div class="prop-hint">Inertia is about the center of gravity, in world axes.</div>
+        }
+      </div>
+
+      <div class="prop-section">
+        <div class="section-title">Bounding Box</div>
+        <div class="prop-row">
+          <span class="prop-label">Min</span>
+          <span class="prop-value small">
+            {{ formatLength(snap.body.boundingBox.min.x) }}, {{ formatLength(snap.body.boundingBox.min.y) }}, {{ formatLength(snap.body.boundingBox.min.z) }}
+          </span>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Max</span>
+          <span class="prop-value small">
+            {{ formatLength(snap.body.boundingBox.max.x) }}, {{ formatLength(snap.body.boundingBox.max.y) }}, {{ formatLength(snap.body.boundingBox.max.z) }}
+          </span>
+        </div>
+      </div>
+
+      <div class="prop-section">
+        <div class="section-title">Transform</div>
+        <div class="prop-row">
+          <span class="prop-label">Position</span>
+          <span class="prop-value small">{{ snap.position.x.toFixed(1) }}, {{ snap.position.y.toFixed(1) }}, {{ snap.position.z.toFixed(1) }}</span>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Rotation</span>
+          <span class="prop-value small">{{ snap.rotationDeg.x.toFixed(1) }}°, {{ snap.rotationDeg.y.toFixed(1) }}°, {{ snap.rotationDeg.z.toFixed(1) }}°</span>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Scale</span>
+          <span class="prop-value small">{{ snap.scale.x.toFixed(2) }}, {{ snap.scale.y.toFixed(2) }}, {{ snap.scale.z.toFixed(2) }}</span>
+        </div>
+      </div>
+    </div>
+  } @else {
+    <div class="empty-state">No selection</div>
+  }
+</div>

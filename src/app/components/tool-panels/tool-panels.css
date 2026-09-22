@@ -1,0 +1,1226 @@
+/* Shared floating-panel chrome — verified identical across every panel that uses it */
+.close-btn {
+  background: transparent;
+  border: none;
+  color: var(--cad-text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.panel-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cad-text-bright);
+  margin-bottom: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.error {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--cad-error);
+}
+
+/*
+ * :host is display:contents — ToolPanels contributes no box of its own. Its 3 top-level
+ * elements (dock-left column, canvas-overlay, dock-right column) become real flex-item
+ * siblings of whatever Viewport places <app-tool-panels> among (see viewport.html/css),
+ * which is what makes docking actually shrink the canvas: the dock columns take real flex
+ * space in Viewport's own flex row, not just space inside an absolutely-positioned overlay.
+ * The canvas/nav-cube/loading-overlay/context-menu content is projected into .canvas-overlay
+ * via <ng-content> from Viewport's template. Each panel's own template (see tool-panels.html)
+ * is projected into whichever of the 3 regions matches its current dock state via
+ * ngTemplateOutlet, so no panel's markup is duplicated across dock states.
+ */
+:host {
+  display: contents;
+}
+
+.dock-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--cad-bg);
+  flex-shrink: 0;
+}
+
+.dock-column-empty {
+  width: 0;
+  overflow: hidden;
+}
+
+.dock-left:not(.dock-column-empty) {
+  border-right: 1px solid var(--cad-border-subtle);
+}
+
+.dock-right:not(.dock-column-empty) {
+  border-left: 1px solid var(--cad-border-subtle);
+}
+
+.canvas-overlay {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+.floating-panel {
+  z-index: 200;
+  pointer-events: auto;
+}
+
+.floating-panel:not(.docked-left):not(.docked-right) {
+  position: absolute;
+}
+
+.floating-panel.docked-left,
+.floating-panel.docked-right {
+  position: static;
+  width: 220px;
+  box-sizing: border-box;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+/* Measure */
+.measure-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 180px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.measure-panel .panel-title {
+  margin-bottom: 6px;
+}
+
+.measure-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 6px;
+}
+
+.measurement-row {
+  font-size: 12px;
+  color: var(--cad-warning);
+  padding: 3px 0;
+  font-family: var(--cad-font-mono);
+}
+
+.measure-panel .clear-btn {
+  margin-top: 6px;
+  width: 100%;
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: var(--cad-radius-md);
+  padding: 5px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.measure-panel .clear-btn:hover {
+  background: var(--cad-control-bg-hover);
+}
+
+/* Section */
+.section-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 220px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.axis-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.axis-label {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  width: 12px;
+}
+
+.axis-row input[type='range'] {
+  flex: 1;
+}
+
+.flip-btn,
+.off-btn {
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: var(--cad-radius-sm);
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.flip-btn:hover,
+.off-btn:hover {
+  background: var(--cad-control-bg-hover);
+}
+
+/* Sketch */
+.sketch-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 200px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.sketch-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.plane-buttons {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.plane-btn {
+  flex: 1;
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: var(--cad-radius-md);
+  padding: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.plane-btn:hover {
+  background: var(--cad-control-bg-hover);
+}
+
+.shape-buttons {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.shape-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: var(--cad-radius-md);
+  padding: 6px;
+  cursor: pointer;
+}
+
+.shape-btn:hover {
+  background: var(--cad-control-bg-hover);
+}
+
+.shape-btn.active {
+  background: var(--cad-accent);
+  border-color: var(--cad-accent-border);
+  color: #fff;
+}
+
+.sketch-panel .field input[type='number'],
+.sketch-panel .field select {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.sketch-panel .field.checkbox {
+  flex-direction: row;
+  align-items: center;
+}
+
+/* Extrude/Revolve finish-mode toggle — same shape Fillet/Chamfer's Fillet/Chamfer toggle and Pattern's Linear/Circular toggle already use, duplicated here per this codebase's per-panel-scoping convention (each panel owns its own copy rather than sharing an unprefixed class). */
+.sketch-panel .kind-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.sketch-panel .kind-btn {
+  flex: 1;
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: var(--cad-radius-md);
+  padding: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sketch-panel .kind-btn:hover {
+  background: var(--cad-control-bg-hover);
+}
+
+.sketch-panel .kind-btn.active {
+  background: var(--cad-accent);
+  border-color: var(--cad-accent-border);
+  color: #fff;
+}
+
+.extrude-btn {
+  width: 100%;
+  background: var(--cad-accent);
+  border: 1px solid var(--cad-accent-border);
+  color: #fff;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.extrude-btn:hover:not(:disabled) {
+  background: var(--cad-accent-hover);
+}
+
+.extrude-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Structural */
+.structural-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 260px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.mode-buttons {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mode-btn {
+  flex: 1;
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: var(--cad-radius-md);
+  padding: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  background: var(--cad-accent);
+  border-color: var(--cad-accent-border);
+  color: #fff;
+}
+
+.structural-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.structural-panel .field input {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cad-text-muted);
+  margin: 10px 0 4px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--cad-text);
+  font-family: var(--cad-font-mono);
+}
+
+.list-row select {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+.row-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inline-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.inline-row input,
+.inline-row select {
+  flex: 1;
+  min-width: 0;
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+.small-btn {
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.small-btn:hover {
+  background: var(--cad-control-bg-hover);
+}
+
+.analyze-btn {
+  width: 100%;
+  background: var(--cad-accent);
+  border: 1px solid var(--cad-accent-border);
+  color: #fff;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.analyze-btn:hover {
+  background: var(--cad-accent-hover);
+}
+
+/* Structural results */
+.results-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 220px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.results-panel .field select,
+.results-panel .field input {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+/* Bridge mesh */
+.bridge-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 240px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.bridge-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.bridge-panel .field input {
+  width: 100%;
+}
+
+.bridge-panel .error {
+  margin-bottom: 8px;
+}
+
+.bridge-panel .clear-btn {
+  width: 100%;
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: var(--cad-radius-md);
+  padding: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.bridge-panel .clear-btn:hover {
+  background: var(--cad-control-bg-hover);
+}
+
+/* Primitive shapes */
+.primitive-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 200px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.primitive-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.primitive-panel .field input[type='number'] {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.primitive-panel .inline-row {
+  margin-top: 4px;
+}
+
+.primitive-panel .inline-row .clear-btn,
+.primitive-panel .inline-row .extrude-btn {
+  flex: 1;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.primitive-panel .inline-row .clear-btn {
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+}
+
+.primitive-panel .inline-row .clear-btn:hover {
+  background: var(--cad-control-bg-hover);
+}
+
+/* Fillet / Chamfer */
+.fillet-chamfer-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 220px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.fillet-chamfer-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.fillet-chamfer-panel .kind-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.fillet-chamfer-panel .kind-btn {
+  flex: 1;
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: var(--cad-radius-md);
+  padding: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fillet-chamfer-panel .kind-btn:hover {
+  background: var(--cad-control-bg-hover);
+}
+
+.fillet-chamfer-panel .kind-btn.active {
+  background: var(--cad-accent);
+  border-color: var(--cad-accent-border);
+  color: #fff;
+}
+
+.fillet-chamfer-panel .pick-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-height: 110px;
+  overflow-y: auto;
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-md);
+}
+
+.fillet-chamfer-panel .pick-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--cad-text);
+  border-bottom: 1px solid var(--cad-border);
+}
+
+.fillet-chamfer-panel .pick-list li:last-child {
+  border-bottom: none;
+}
+
+.fillet-chamfer-panel .pick-list .edge-value-input {
+  width: 56px;
+  margin: 0 6px;
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 2px 5px;
+  font-size: 11px;
+}
+
+.fillet-chamfer-panel .field input[type='number'] {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.fillet-chamfer-panel .inline-row .extrude-btn {
+  flex: 1;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Pattern (Linear/Circular) — same shape as the Fillet/Chamfer block above, no pick-list needed since Pattern has no viewport picking step */
+.pattern-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 220px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.pattern-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.pattern-panel .kind-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.pattern-panel .kind-btn {
+  flex: 1;
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: var(--cad-radius-md);
+  padding: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pattern-panel .kind-btn:hover {
+  background: var(--cad-control-bg-hover);
+}
+
+.pattern-panel .kind-btn.active {
+  background: var(--cad-accent);
+  border-color: var(--cad-accent-border);
+  color: #fff;
+}
+
+.pattern-panel .field select,
+.pattern-panel .field input[type='number'] {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.pattern-panel .inline-row .extrude-btn {
+  flex: 1;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pattern-panel .inline-row .extrude-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mirror-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 220px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.mirror-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.mirror-panel .field select {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.mirror-panel .inline-row .extrude-btn {
+  flex: 1;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mirror-panel .inline-row .extrude-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hole-wizard-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 220px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.hole-wizard-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.hole-wizard-panel .field select {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.hole-wizard-panel .inline-row .extrude-btn {
+  flex: 1;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.hole-wizard-panel .inline-row .extrude-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.reference-plane-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 240px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.reference-plane-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.reference-plane-panel .field input {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.reference-plane-panel .inline-row .extrude-btn {
+  flex: 1;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.reference-plane-panel .inline-row .extrude-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Plain text-link affordance for a low-emphasis inline action ("change" next to the picked base) — deliberately not a full .ribbon-btn/.plane-btn-styled button, since this isn't a primary action. */
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--cad-accent);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* Small icon-only action button reused for the reference-plane list's per-row actions — same visual language SidePanels' own .visibility-toggle/.delete-toggle already use for tree-row icon actions (opacity-on-hover, no border/background), duplicated here since tool-panels.css and side-panels.css are separate stylesheets with no shared base. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--cad-text);
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.icon-btn:hover {
+  opacity: 1;
+}
+
+.reference-plane-list {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--cad-border-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reference-plane-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reference-plane-row .node-rename-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--cad-control-bg);
+  border: 1px solid transparent;
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-sm);
+  padding: 3px 5px;
+  font-size: 12px;
+}
+
+.reference-plane-row .node-rename-input:hover,
+.reference-plane-row .node-rename-input:focus {
+  border-color: var(--cad-border);
+}
+
+/* Shell — same pick-list shape the Fillet/Chamfer block above uses, no kind-toggle needed since Shell has only one operation. */
+.shell-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 220px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.shell-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.shell-panel .pick-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-height: 110px;
+  overflow-y: auto;
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-md);
+}
+
+.shell-panel .pick-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--cad-text);
+  border-bottom: 1px solid var(--cad-border);
+}
+
+.shell-panel .pick-list li:last-child {
+  border-bottom: none;
+}
+
+.shell-panel .field input[type='number'] {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.shell-panel .inline-row .extrude-btn {
+  flex: 1;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.shell-panel .inline-row .extrude-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Draft — same pick-list shape the Shell block above uses (both pick multiple faces on one body). */
+.draft-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 220px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.draft-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.draft-panel .pick-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-height: 110px;
+  overflow-y: auto;
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-md);
+}
+
+.draft-panel .pick-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--cad-text);
+  border-bottom: 1px solid var(--cad-border);
+}
+
+.draft-panel .pick-list li:last-child {
+  border-bottom: none;
+}
+
+.draft-panel .field input[type='number'] {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.draft-panel .inline-row .extrude-btn {
+  flex: 1;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.draft-panel .inline-row .extrude-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.loft-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 220px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.loft-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+  margin-bottom: 8px;
+}
+
+.loft-panel .pick-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-height: 110px;
+  overflow-y: auto;
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-md);
+}
+
+.loft-panel .pick-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--cad-text);
+  border-bottom: 1px solid var(--cad-border);
+}
+
+.loft-panel .pick-list li:last-child {
+  border-bottom: none;
+}
+
+.loft-panel .extrude-btn {
+  width: 100%;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.loft-panel .extrude-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Drop-zone affordance shown while dragging a panel near a dockable edge */
+.dock-zone-indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  background: rgba(42, 111, 219, 0.25);
+  border: 1px dashed var(--cad-accent);
+  z-index: 300;
+  pointer-events: none;
+}
+
+.dock-zone-indicator.dock-zone-left {
+  left: 0;
+}
+
+.dock-zone-indicator.dock-zone-right {
+  right: 0;
+}
+
+/* Feature Tree (parametric feature tree, Slice 1) — same panel-chrome/pick-list shape every other panel above already uses. */
+.feature-tree-panel {
+  background: var(--cad-panel-bg-translucent);
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-lg);
+  padding: 10px;
+  min-width: 220px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.feature-tree-panel .hint {
+  font-size: 11px;
+  color: var(--cad-text-secondary);
+}
+
+.feature-tree-panel .pick-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--cad-border);
+  border-radius: var(--cad-radius-md);
+}
+
+.feature-tree-panel .pick-list li {
+  padding: 0;
+  font-size: 11px;
+  color: var(--cad-text);
+  border-bottom: 1px solid var(--cad-border);
+}
+
+.feature-tree-panel .pick-list li:last-child {
+  border-bottom: none;
+}
+
+.feature-tree-panel .pick-list li.active {
+  background: var(--cad-control-bg);
+}
+
+.feature-row-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--cad-text);
+  cursor: pointer;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.feature-row-btn:hover {
+  background: var(--cad-control-bg);
+}
+
+.feature-edit-form {
+  padding: 8px;
+}
+
+.feature-edit-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cad-text-bright);
+  margin-bottom: 6px;
+}
+
+.feature-edit-form .field input[type='number'] {
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-bright);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.feature-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.feature-edit-actions .extrude-btn {
+  flex: 1;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.feature-edit-actions .extrude-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  flex: 1;
+  border-radius: var(--cad-radius-md);
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+  background: var(--cad-control-bg);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+}
+
+.cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.measure-panel .kind-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.measure-panel .kind-btn {
+  flex: 1;
+  background: var(--cad-control-bg-alt);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: var(--cad-radius-md);
+  padding: 4px 2px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.measure-panel .kind-btn:hover {
+  background: var(--cad-control-bg-hover);
+}
+
+.measure-panel .kind-btn.active {
+  background: var(--cad-accent);
+  border-color: var(--cad-accent-border);
+  color: #fff;
+}
