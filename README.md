@@ -1,59 +1,45 @@
-# MyApp
+# Browser CAD Viewer
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.3.0.
+A 3D mechanical CAD tool that runs entirely in the browser — no install, no account, no server.
+Everything you open, draw, and analyze stays on your own machine for the life of the tab.
 
-## Development server
+You can open and inspect STEP files, build parts from scratch (sketch + extrude/revolve/sweep/loft,
+primitives), modify existing parts (cut, boss, fillet/chamfer, shell, draft, hole wizard, pattern,
+mirror), inspect and measure a model (distance, angle, face-to-face, radius/diameter, mass
+properties), and run a basic structural (beam/frame) analysis — all client-side.
 
-To start a local development server, run:
+For what you can do in the app, see **[context/user-manual.md](context/user-manual.md)**.
+For how it's built internally, see **[context/architecture.md](context/architecture.md)**.
+For a gap analysis against professional mechanical CAD suites and the development roadmap, see
+**[context/cad-gap-analysis.md](context/cad-gap-analysis.md)**.
 
-```bash
-ng serve
-```
+## Stack
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+Angular 20 (standalone components, signals), Three.js for rendering, OpenCascade.js (the OCCT
+geometry kernel, compiled to WASM) running in a Web Worker for all solid modelling.
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Development
 
 ```bash
-ng generate --help
+npm install
+npm start        # ng serve — http://localhost:4200 by default (printed on start)
 ```
-
-## Building
-
-To build the project run:
 
 ```bash
-ng build
+npm run build     # production build, output in dist/
+npm test          # unit tests (Karma + Jasmine); needs a Chrome/Chromium binary —
+                   # set CHROME_BIN if it isn't auto-detected
+npx tsc --noEmit -p tsconfig.app.json     # typecheck the app
+npx tsc --noEmit -p tsconfig.worker.json  # typecheck the OCCT worker
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+End-to-end / kernel-level verification lives in the `verify-*.mjs` scripts at the repo root —
+Playwright drivers against a running `ng serve` instance, exercising real geometry operations with
+numeric before/after checks (not just "no error thrown"). Run `ng serve --port 4300` in one
+terminal, then e.g. `node verify-measure-types.mjs` in another (`PW_CHANNEL=chrome` if Playwright's
+own bundled browser isn't installed).
 
-## Running unit tests
+## Sample files
 
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+`public/assets/*.STEP` are example parts you can open via **File → Open STEP…** inside the app —
+they are not loaded automatically.

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Typecheck app
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+      - name: Typecheck worker
+        run: npx tsc --noEmit -p tsconfig.worker.json
+
+      # The production build failed for months before 2026-09-21 (opencascade.js's Node-only `fs`
+      # require confused esbuild) — this step exists specifically so that class of regression can't
+      # come back silently.
+      - name: Production build
+        run: npm run build
+
+      - name: Set up Chrome for Karma
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Unit tests
+        run: npx ng test --watch=false --browsers=ChromeHeadless
+        env:
+          CHROME_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
