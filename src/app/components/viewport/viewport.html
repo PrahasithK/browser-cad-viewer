@@ -34,6 +34,24 @@
       (change)="onStepFileSelected($event)"
     />
 
+    <input
+      #projectFileInput
+      type="file"
+      accept=".cadproj"
+      class="project-file-input"
+      title="Open project"
+      (change)="onProjectFileSelected($event)"
+    />
+
+    @if (projectBusyMessage(); as message) {
+      <div class="loading-overlay">
+        <div class="loading-dialog">
+          <div class="spinner"></div>
+          <div class="loading-message">{{ message }}</div>
+        </div>
+      </div>
+    }
+
     @if (loadingVisible) {
       <div class="loading-overlay">
         <div class="loading-dialog">

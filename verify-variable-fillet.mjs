@@ -10,7 +10,7 @@ function assert(cond, msg) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] });
+  const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || undefined, args: ['--disable-gpu', '--disable-dev-shm-usage'] });
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   page.setDefaultTimeout(60000);
   const errs = [];

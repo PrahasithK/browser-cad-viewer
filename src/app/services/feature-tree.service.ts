@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { ClientFeatureRecord } from '../models/feature-record.model';
-import { FilletChamferEdgeValue, FilletChamferKind } from '../workers/step-worker-messages.model';
+import { FilletChamferEdgeValue, FilletChamferKind, HoleFeatureParams } from '../workers/step-worker-messages.model';
 
 /**
  * Read-oriented registry of every feature built through the new parametric-feature-tree-aware
@@ -67,6 +67,7 @@ export class FeatureTreeService {
   update(featureId: string, params: { axis: 'u' | 'v'; tiltDeg: number; distance: number; cut: boolean }): void;
   update(featureId: string, params: { cut: boolean }): void;
   update(featureId: string, params: { filletChamferKind: FilletChamferKind; edges: FilletChamferEdgeValue[] }): void;
+  update(featureId: string, params: HoleFeatureParams): void;
   update(
     featureId: string,
     params:
@@ -75,10 +76,13 @@ export class FeatureTreeService {
       | { axis: 'u' | 'v'; tiltDeg: number; distance: number; cut: boolean }
       | { cut: boolean }
       | { filletChamferKind: FilletChamferKind; edges: FilletChamferEdgeValue[] }
+      | HoleFeatureParams
   ): void {
     this.featuresState.update((current) =>
       current.map((f) => {
         if (f.featureId !== featureId) return f;
+        // Hole params also carry `depth`, so check `holeType` first and keep it out of the extrude/loft branches.
+        if ('holeType' in params) return f.kind === 'hole' ? { ...f, params } : f;
         if (f.kind === 'extrude' && 'depth' in params) return { ...f, params };
         if (f.kind === 'revolve' && 'angleDeg' in params) return { ...f, params };
         if (f.kind === 'sweep' && 'tiltDeg' in params) return { ...f, params };
@@ -98,6 +102,12 @@ export class FeatureTreeService {
   }
 
   cancelEdit(): void {
+    this.editingFeatureId.set(null);
+  }
+
+  /** Replaces the list with a saved one (project open). */
+  restore(records: ClientFeatureRecord[]): void {
+    this.featuresState.set(records);
     this.editingFeatureId.set(null);
   }
 

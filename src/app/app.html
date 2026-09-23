@@ -1,5 +1,5 @@
 <div class="cad-shell">
-  <app-chrome (openStepFile)="onOpenStepFile()"></app-chrome>
+  <app-chrome (openStepFile)="onOpenStepFile()" (openProjectFile)="onOpenProjectFile()"></app-chrome>
 
   <div class="cad-main" [style.grid-template-columns]="gridTemplateColumns()">
     <app-side-panels

@@ -15,7 +15,7 @@ import { PrimitiveToolService } from '../../services/primitive-tool.service';
 import { FilletChamferToolService } from '../../services/fillet-chamfer-tool.service';
 import { PatternToolService } from '../../services/pattern-tool.service';
 import { MirrorToolService } from '../../services/mirror-tool.service';
-import { HoleWizardService } from '../../services/hole-wizard.service';
+import { HOLE_TYPE_LABELS, HoleWizardService } from '../../services/hole-wizard.service';
 import { ReferencePlaneService } from '../../services/reference-plane.service';
 import { ShellToolService } from '../../services/shell-tool.service';
 import { DraftToolService } from '../../services/draft-tool.service';
@@ -33,7 +33,7 @@ import { AnalysisResult } from '../../models/structural-result.model';
 import { PrimitiveDimensions } from '../../models/primitive-tool.model';
 import { MirrorPlane } from '../../models/mirror-tool.model';
 import { HoleFit, HoleStandard, holePresetsFor } from '../../models/hole-wizard.model';
-import { FilletChamferEdgeValue, FilletChamferKind } from '../../workers/step-worker-messages.model';
+import { FilletChamferEdgeValue, FilletChamferKind, HoleFeatureParams, HoleType } from '../../workers/step-worker-messages.model';
 import { ReferencePlane } from '../../models/reference-plane.model';
 import { RevolveAxis, SketchShape, SweepAxis } from '../../models/sketch.model';
 import { DockMode, ToolPanelId } from '../../models/panel-layout.model';
@@ -186,6 +186,8 @@ export class ToolPanels {
   /** Fillet/Chamfer's own edit-form state (Slice 5) — a repeating per-edge list, unlike the other four kinds' flat scalar fields, so it gets its own field rather than joining the shared featureEdit* set above. */
   featureEditFilletChamferKind: FilletChamferKind = 'fillet';
   featureEditEdges: FilletChamferEdgeValue[] = [];
+  /** Hole's own edit-form state — a copy of the record's params, edited field by field. */
+  featureEditHole: HoleFeatureParams | null = null;
   readonly featureEditBusy;
   readonly featureEditError;
   /** Only has an effect if the FIRST profile was sketched on an existing part's face — see LoftToolService.finishLoft's own docstring. */
@@ -291,11 +293,15 @@ export class ToolPanels {
     // this panel already uses for featureEdit* fields.
     this.featureEditBusy = computed(() => {
       const record = this.featureTreeEditingId() ? this.featureTree.find(this.featureTreeEditingId()!) : undefined;
-      return record?.kind === 'filletChamfer' ? this.filletChamferTool.busy() : this.sketch.busy();
+      if (record?.kind === 'filletChamfer') return this.filletChamferTool.busy();
+      if (record?.kind === 'hole') return this.holeWizardTool.busy();
+      return this.sketch.busy();
     });
     this.featureEditError = computed(() => {
       const record = this.featureTreeEditingId() ? this.featureTree.find(this.featureTreeEditingId()!) : undefined;
-      return record?.kind === 'filletChamfer' ? this.filletChamferTool.lastError() : this.sketch.lastError();
+      if (record?.kind === 'filletChamfer') return this.filletChamferTool.lastError();
+      if (record?.kind === 'hole') return this.holeWizardTool.lastError();
+      return this.sketch.lastError();
     });
   }
 
@@ -775,6 +781,18 @@ export class ToolPanels {
     return this.holeWizardTool.currentDiameter();
   }
 
+  onHoleWizardTypeChange(event: Event): void {
+    this.holeWizardTool.setHoleType((event.target as HTMLSelectElement).value as HoleType);
+  }
+
+  onHoleWizardEntrySizeChange(field: 'cboreDiameter' | 'cboreDepth' | 'csinkDiameter' | 'csinkAngleDeg', event: Event): void {
+    this.holeWizardTool.setEntrySize(field, Number((event.target as HTMLInputElement).value));
+  }
+
+  holeWizardEntryError(): string | null {
+    return this.holeWizardTool.entryError();
+  }
+
   canCommitHoleWizard(): boolean {
     return this.holeWizardTool.canCommit();
   }
@@ -1004,10 +1022,26 @@ export class ToolPanels {
     } else if (record.kind === 'filletChamfer') {
       this.featureEditFilletChamferKind = record.params.filletChamferKind;
       this.featureEditEdges = record.params.edges.map((e) => ({ ...e }));
+    } else if (record.kind === 'hole') {
+      this.featureEditHole = { ...record.params };
     } else {
       this.featureEditCut = record.params.cut;
     }
     this.featureTree.beginEdit(featureId);
+  }
+
+  /** A hole's label starts with its type as created ("Counterbore (M6, normal)") — swap in the current type so the row stays right after an edit changes it. */
+  holeRowLabel(label: string, holeType: HoleType): string {
+    return label.replace(/^\S+/, HOLE_TYPE_LABELS[holeType]);
+  }
+
+  onFeatureEditHoleTypeChange(event: Event): void {
+    if (this.featureEditHole) this.featureEditHole = { ...this.featureEditHole, holeType: (event.target as HTMLSelectElement).value as HoleType };
+  }
+
+  onFeatureEditHoleSizeChange(field: 'diameter' | 'cboreDiameter' | 'cboreDepth' | 'csinkDiameter' | 'csinkAngleDeg', event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    if (this.featureEditHole && Number.isFinite(value) && value > 0) this.featureEditHole = { ...this.featureEditHole, [field]: value };
   }
 
   /** Sets one edge's own value in the Feature Tree edit form's edge list — mirrors FilletChamferToolService.setEdgeValue's per-edge-independence, adapted for the edit-form's own local array instead of the tool panel's live picking state. */
@@ -1107,6 +1141,16 @@ export class ToolPanels {
           label: `Edit ${newParams.filletChamferKind === 'fillet' ? 'Fillet' : 'Chamfer'}: ${bodyName}`,
           redo: () => void this.filletChamferTool.commitEditOfFilletChamferFeature(featureId, newParams.filletChamferKind, newParams.edges),
           undo: () => void this.filletChamferTool.commitEditOfFilletChamferFeature(featureId, oldParams.filletChamferKind, oldParams.edges)
+        });
+      } else if (record.kind === 'hole') {
+        if (!this.featureEditHole) return;
+        const oldParams = record.params;
+        const newParams = { ...this.featureEditHole };
+        await this.holeWizardTool.commitEditOfHoleFeature(featureId, newParams);
+        this.history.run({
+          label: `Edit Hole: ${bodyName}`,
+          redo: () => void this.holeWizardTool.commitEditOfHoleFeature(featureId, newParams),
+          undo: () => void this.holeWizardTool.commitEditOfHoleFeature(featureId, oldParams)
         });
       } else {
         const oldParams = record.params;

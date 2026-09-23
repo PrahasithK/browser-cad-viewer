@@ -28,6 +28,10 @@ export class App {
     this.viewport.promptImportStepFile();
   }
 
+  onOpenProjectFile(): void {
+    this.viewport.promptOpenProjectFile();
+  }
+
   onDeletePart(nodeId: string): void {
     this.viewport.confirmAndDeletePart(nodeId);
   }

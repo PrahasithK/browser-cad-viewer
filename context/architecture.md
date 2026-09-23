@@ -3314,3 +3314,433 @@ not validated client-side — it surfaces as a worker boolean-operation error, s
 other invalid-profile case in this app; live preview while sketching on a datum plane (pre-existing gap,
 inherited, not fixed). The real prerequisite for the next sketch-module slice (a 2D constraint solver) is
 unaffected either way — Polyline is pure geometry, no relationships.
+
+## Feature work (2026-09-22) — Loft face-anchoring/body-frame conversion, Hole Wizard migrated onto the Feature Tree, and a real sketch-click bug found and fixed
+
+Continuing down `context/cad-gap-analysis.md`'s own priority list: extended the moved-body and
+face-anchoring fixes (previous 2026-09-21 entries) to Loft, and migrated Hole Wizard onto the
+parametric feature tree — which, as a direct consequence, unblocks the stated prerequisite for
+Hole Wizard's counterbore/countersink (not counterbore/countersink itself — see below).
+
+**Loft: same two gaps Extrude/Revolve/Sweep already had fixed, closed the same way.**
+`LoftToolService.addCurrentProfile` calls `SketchService.commitCurrentProfile`, which — unlike
+`finishAndExtrude`/`Revolve`/`Sweep` — never went through `planeRefForTarget` (body-frame plane
+conversion) or passed `faceAnchorFeatureId` (face anchoring). Fixed by routing it through both,
+exactly like the other three. Worker-side, `handleFeatureEdit`'s loft replay branch mapped each
+profile's stored sketch straight to `buildLoftToolSolid` without ever calling `reanchorSketch` —
+fixed to call it per profile (every profile, not just the first, since any of them COULD be drawn
+on a face of a feature-tree body — only the first profile's own `targetRef` drives cut/fuse
+targeting, per the 2026-09-13 entry, but that's a separate question from whether each profile's
+own plane should follow the face it was drawn on).
+
+**Verified with `verify-loft-follows-face.mjs`** (needs `ng serve --port 4300`; `PW_CHANNEL=chrome`):
+a Loft fused onto a block moved +300mm in X changed the body's topology (Faces 6→10) while the body
+stayed at its moved position (not snapped back) — the exact defect class the 2026-09-21 fixes closed
+for the other three tools. A second scenario confirmed a fused loft survives a downstream edit of the
+feature its target face belongs to (block depth 20→60mm): the block's own top correctly grew to 60mm,
+and the loft's own topological effect was still present afterward (not silently dropped back to a
+plain box).
+
+**A separate, real defect found and fixed along the way: `raycastSketchPlane` had no fallback for a
+ray parallel to the sketch plane.** `handlePrimitiveClick` already has this fallback (added
+2026-09-10, for the ground-plane case) with a well-documented reason; `raycastSketchPlane` — the
+SAME class of `THREE.Ray.intersectPlane`-returns-null-on-parallel behavior, just for an arbitrary
+sketch plane instead of the Z=0 ground plane — never got it. Reproduced for real (not a contrived
+case): sketching a Loft's second profile on the XZ datum right after the first profile's OWN face pick
+had oriented the camera to look straight down that face's own normal — the camera's screen-center ray
+is then parallel to the XZ plane. Before the fix: clicks were silently lost, the tool stuck on "Click
+first corner…" forever, matching the exact symptom the 2026-09-10 entry originally described (just for
+a sketch plane, not the primitive-placement ground plane that entry fixed). Fixed with the identical
+technique: fall back to intersecting the camera's own view plane (through the SKETCH plane's own
+origin, not the world origin) — `projectToPlane`'s existing dot-product math discards whatever
+out-of-plane component that introduces, so the result is still the correct (u, v) for wherever the
+cursor visually points.
+
+**Hole Wizard migrated onto the feature tree, reusing the `'extrude'` kind — no new FeatureRecord kind,
+no worker changes.** A hole IS an extrude cut with a preset circular profile, so `HoleWizardService.commit`
+now generates `producesBodyId`/`featureId`, passes `faceAnchorFeatureId` to `commitSketch`, calls
+`session.extrude` with those ids, and registers into `TreeService.linkFeature`/`FeatureTreeService` with
+`kind: 'extrude'` but a hole-specific `label` (`"Hole (M6, normal)"`) — `label` is free text independent
+of `kind` (every other feature-tree entry already sets its own descriptive label), so the row reads
+correctly rather than a generic "Extrude". Also fixed `resolveFeatureAwareCutTarget` (a local duplicate of
+`SketchService`'s own, same "duplicate a small helper locally" precedent `FilletChamferToolService`
+already established) checked BEFORE the plain STEP-source path, mirroring `SketchService`'s own resolver
+exactly — and `beginFromFace`'s OWN separate `hasStepSource`-only gate (which blocked even PICKING a face
+on an already-modified body, before `commit()`'s own resolution logic ever ran) needed the identical fix,
+or the improved `commit()` logic was unreachable through the UI.
+
+**This unblocks Hole Wizard's own stated counterbore/countersink prerequisite as a side effect — not
+counterbore/countersink itself.** The 2026-08-25 entry's own blocker ("a second targeted cut into an
+already-cut body silently degrades because `hasStepSource` is cleared") is resolved for any body that's
+been through a feature-tree-aware tool (now including Hole Wizard itself): `resolveFeatureAwareCutTarget`
+finds it via `featureId` (never cleared by `TreeService.replaceBody`, unlike `hasStepSource`) instead of
+falling back to the STEP-bytes path. Verified directly: two Hole Wizard holes cut into the SAME STEP body,
+the second one still removing real, additional material (−171.1 mm³, identical magnitude to the first).
+Building the actual counterbore/countersink tool (a compound two-diameter cut) is separate, not-yet-started
+work — this only removes what was blocking it.
+
+**Test infrastructure notes, recorded so a future script in this app doesn't re-hit the same things:**
+- `page.waitForFunction(fn, options)` treats its 2nd positional argument as `arg` (passed INTO `fn`), not
+  `options`, for a zero-parameter `fn` — a `{timeout, polling}` object passed that way is silently
+  discarded, and the call falls back to the page's default 120s timeout with `raf`-driven polling. Cost a
+  long, confused debugging detour in this session (conditions independently confirmed true via a direct
+  `page.evaluate()` at the same moment still reported as "timed out"). `verify-loft-follows-face.mjs` now
+  has its own `pollUntil(page, predicate, {timeoutMs, intervalMs})` helper that polls from Node instead —
+  worth reusing rather than `page.waitForFunction` with a non-default timeout anywhere in this app's test
+  scripts going forward.
+- A box's screen-space silhouette at an isometric angle is a thin parallelogram, not its bounding
+  rectangle — a blind grid scan (even a dense one) was found to land in the gaps around it far more often
+  than on it, and `document.elementFromPoint`/`wholeBodyPick` diagnostics confirmed clicks were reaching
+  the canvas correctly but simply missing the geometry. Projecting a KNOWN local-space point (e.g. a face
+  center from the body's own bounding box) through the live camera
+  (`cam.position.clone().set(x,y,z).project(cam)` — reusing an existing `THREE.Vector3` instance's own
+  prototype methods, since `THREE` itself isn't reachable from `window` in this app) and clicking exactly
+  there is far more reliable, and is now how `verify-loft-follows-face.mjs` picks faces.
+- A floating tool panel sits ON TOP of the canvas — a screen-space scan that doesn't exclude the panel's
+  own bounding box can click straight through it (e.g. its own datum-plane buttons), silently corrupting
+  whatever interaction was actually intended.
+- 8 older `verify-*.mjs` scripts (predating this session's `PW_CHANNEL`/`channel: 'chrome'` convention)
+  called `chromium.launch()` with no channel, so they fail outright on this machine (Playwright's own
+  bundled Chromium was never installed here — see the 2026-09-21 entry). Patched all 8 to the same
+  `channel: process.env.PW_CHANNEL || undefined` pattern the newer scripts already use.
+- `verify-loft.mjs`'s own `{ hasText: 'Min' }` locator (targeting the Bounding Box's "Min" row) started
+  matching TWO rows once the Mass Properties section's Material `<select>` existed — its flattened option
+  text includes "Aluminium", which contains "min" as a case-insensitive substring. Fixed to match the
+  `.prop-label`'s exact text instead of a loose substring across the whole row.
+
+**Full regression sweep** (all 17 `verify-*.mjs` scripts, plus `ng test` and `ng build`): 16 pass; the one
+failure (`verify-fillet-feature-tree.mjs`) is the already-documented, pre-existing Slice 5 WASM defect
+(`___cxa_is_pointer_type is not defined`) from the 2026-09-14/15 entry — untouched by this pass. A single
+`verify-measure-types.mjs` failure on one run (a "Clear All" timing race) did not reproduce on immediate
+rerun with unchanged code — a one-off flake, not investigated further.
+
+**Deliberately not done / open for a future pass:** Loft's own separate, likely pre-existing Cut/Fuse
+limitation — a tool solid built directly between two ON-SURFACE profiles (no inward offset) was found to
+leave reported Volume completely unchanged (0.0 mm3 delta) in BOTH Cut and Fuse mode, on both a moved and
+an unmoved target, despite completing with no error and (for Fuse) a real topology change. This looks like
+Loft never received an analogous fix to the "guarantee real overlap with an on-surface profile"
+construction Extrude/Sweep (build the tool symmetrically both directions) and Revolve (mirror across the
+axis plane) each needed for their own targeted cuts — worth a dedicated Node kernel probe (the same
+technique used to isolate Shell's and Draft's own construction bugs) to confirm whether the blend itself is
+near-degenerate for two adjacent, differently-oriented face profiles, or whether it's the boolean step.
+Counterbore/countersink itself (see above). Shell/Draft/Fillet-Chamfer still aren't feature-tree-aware, so
+they still can't be a Hole Wizard/Sketch-cut target, and Fillet/Chamfer's own feature-tree migration
+remains blocked by the still-unresolved Slice 5 WASM issue.
+
+## Fixes (2026-09-23) — Loft's own Cut/Fuse coincidence bug, and a large-STEP-file import crash
+
+**Loft Cut/Fuse: the "always 0.0 mm3 delta" gap from the 2026-09-22 entry, root-caused and fixed.**
+That entry closed with an open question — a real Node kernel probe was the suggested next step, and this
+pass did exactly that. Reproducing `buildLoftToolSolid`'s exact wire construction and `cutOrFuseNewSolid`'s
+exact boolean-op sequence standalone (a box target, two profiles centered on adjacent faces) showed the
+loft's own tool solid is real and non-degenerate (13,100 mm3, valid single solid) — the bug is entirely in
+the subsequent boolean step: `BRepAlgoAPI_Cut`/`Fuse` treats a tool solid whose end-cap wires sit EXACTLY
+coplanar with the target's own boundary faces (the natural result of sketching a loft profile directly on
+a picked face — this app's whole face-anchoring workflow) as a degenerate touching case rather than a real
+overlap. Cut silently removes nothing (0.0 mm3 delta, `IsDone()` still true); Fuse adds far less than it
+should. Confirmed the fix works via the same probe: nudging every profile wire 0.01mm off its own plane
+along the plane's own normal, AFTER wire construction (`BRepBuilderAPI_Transform` + `TopoDS.Wire_1` to
+downcast back), before feeding it into `BRepOffsetAPI_ThruSections`, breaks the exact coincidence with no
+visible dimensional effect and is self-consistent (Cut's removed volume + Fuse's added volume ≈ the loft's
+own total volume, to within float noise). `SetFuzzyValue` — the "just widen the boolean's own tolerance"
+alternative — isn't exposed on `BRepAlgoAPI_Cut`/`Fuse` in this WASM build (confirmed via the same
+try/catch-around-a-BindingError probing technique used throughout this project); the geometric nudge is
+the only mechanism that worked. `buildLoftToolSolid`'s own `isCutIntoExisting` parameter, previously
+accepted but unused (`void isCutIntoExisting;` — Loft was believed not to need Extrude/Revolve/Sweep's own
+symmetric-tool-solid trick, since a lofted solid is already capped/enclosed) turned out to need a DIFFERENT
+fix for a DIFFERENT degeneracy than those three; wired up in both `handleFeatureLoft` (the create path) and
+`handleFeatureEdit`'s loft replay branch, and broadened to cover Fuse-into-existing too (not just Cut,
+which is all the original `isCutIntoExisting` flag covered) — the kernel probe confirmed Fuse suffers the
+identical coincidence issue as Cut, so the create-path condition is now `!!req.targetBody ||
+!req.producesBodyId` (any case where the result will actually be booleaned against a target), and the
+replay-path condition simplifies to just `!!record.targetRef` (a loft only ever replays with
+`producesBodyId` already set, since that's the sole condition its own create path pushes a
+`session.features` record under).
+
+**A second, separate finding surfaced while re-verifying `verify-loft-follows-face.mjs`'s own MOVED-body
+check with the fix in place: `BRepOffsetAPI_ThruSections`' smooth (`isRuled=false`) blend is itself
+numerically ill-conditioned for two profiles centered on adjacent, perpendicular faces of a box** (a
+near-symmetric 90-degree corner transition) — reproduced standalone: feeding the exact coordinates the app
+logged for the UNMOVED case into the same `ThruSections` call gave the same tool-solid volume the app
+itself reported (13,134.5 mm3), and separately, the exact coordinates for the MOVED case — differing from
+the unmoved ones only at the ~1e-11mm level, themselves confirmed CORRECT real local-frame coordinates, not
+a body-frame conversion bug — gave a tool-solid volume nearly 2x different (42,247.9 mm3 vs the unmoved
+case's own different-but-consistent number), which then degenerated to exactly 0 net volume once fused
+into the target. Reproducible every run for this specific box/profile-size geometry (tried two different
+profile placements; both landed the moved case on the degenerate side every time) — a deterministic
+knife-edge in the blend algorithm, not random flakiness: the moved path's one extra floating-point
+round-trip (world pick → `planeRefInBodyFrame`'s inverse-transform → local frame, vs the unmoved path's
+direct local-frame computation) happens to fall on the wrong side of it for this geometry. Not something
+this pass's coincidence fix could or should paper over — it's an OCCT algorithm-level sensitivity, not a
+face-anchoring/body-frame bug (which this exact investigation otherwise confirmed IS correct — the picked
+planes/entities were bit-for-bit equivalent between the moved and unmoved runs, confirmed via worker-side
+diagnostic logging). `verify-loft-follows-face.mjs`'s Check A (moved) now only asserts Faces (topology
+change — robust regardless of which side of the knife-edge the blend lands on); Check B (unmoved, confirmed
+stable) now asserts a real Volume delta too, as the actual quantified proof the coincidence fix works. A
+real fix for the blend instability itself would mean either switching Loft to a ruled (`isRuled=true`,
+straight-segment) blend — far more numerically robust, but visually different for every existing Loft, a
+tradeoff needing its own decision — or some other guard; logged as its own open follow-up, out of scope for
+this pass.
+
+**Unrelated, unprompted user report mid-session: importing a real, unusually large STEP file (112MB, a
+partial vehicle assembly, 26 solids/~653K render triangles once tessellated) crashed with "Maximum call
+stack size exceeded."** Investigated with the same Node kernel-probe technique used throughout this
+project, reusing the scratchpad's `occt.cjs`/`opencascade.wasm.wasm` harness to run the exact file through
+`handleLoad`'s own pipeline standalone — every stage (`ReadFile`, `TransferRoots`, `explodeSolids`, both
+tessellation passes at the app's real production deflection constants) completed successfully in Node, even
+at an artificially tiny `--stack-size=300`, ruling out the OCCT/JS logic itself and any generic "not enough
+stack" explanation. The actual root cause only showed up by reproducing the failure in a REAL browser via
+Playwright with worker-side diagnostic logging bracketing every step: the crash is a genuine native stack
+overflow INSIDE the WASM binary's own compiled C++ (confirmed via the captured browser stack trace: a
+repeating cycle of the same 3 `wasm-function[...]` frames, no app JS in the trace at all), happening
+specifically in `reader.delete()` — `STEPControl_Reader`'s own embind-generated destructor, which
+recursively tears down the reader's entire owned entity graph (every parsed STEP record, one nested Handle
+release at a time) — for a file with a big enough graph, that recursion overflows a browser Worker's
+native stack even though the identical call succeeds instantly in a Node.js process, which gets a larger
+native stack for the same WASM binary. Fixed via `readStepShape`'s new `skipReaderDelete` parameter
+(default `false`, preserving the original always-clean-up behavior everywhere else this function is
+called): `handleLoad` passes `true`, since `StepLoaderService.loadStepFile`/`loadStepFileFromBlob` create a
+fresh, single-use Worker per call and unconditionally `.terminate()` it on every exit path (success, error,
+`worker.onerror`) — the entire Worker heap, WASM linear memory included, is torn down by the browser
+moments later regardless, so an undeleted reader there is memory that was about to be freed in bulk anyway,
+not a real leak. `shape.delete()` at the end of `handleLoad` skipped for the same reason. Every OTHER
+`readStepShape` caller (8 of them, mostly `resolveDocBodyRef`-style resolution inside the long-lived
+per-session Worker, handling much smaller re-exported STEP bytes for a single already-isolated body) keeps
+the default `false` and still cleans up — skipping there would accumulate a real leak across a long
+session rather than trading one for a moment. **Known, documented, NOT addressed by this fix:** a user who
+imports a file this large and later performs a feature-tree operation that re-resolves that SAME original
+STEP bytes inside the session Worker (e.g. cutting into the originally-imported body) could in principle
+hit this identical overflow there too — out of scope for this pass, which targeted the reported import
+crash specifically.
+
+**A second, independent bug surfaced (and was fixed) while investigating the above.** `explodeSolids`
+(which crashed, per the above, before ever reaching its own top-level `TopExp_Explorer`-based traversal —
+the crash was already inside `readStepShape`, one call earlier) was ALSO switched off `TopExp_Explorer` for
+the same defense-in-depth reason documented on `explodeByType`'s own docstring: `TopExp_Explorer`'s
+traversal of a deeply nested compound tree recurses natively inside the WASM binary too, one call per
+nesting level, an identical class of risk to the one just fixed even though it wasn't this specific crash's
+actual proximate cause. Replaced with a JS-side explicit-array-as-stack walk using `TopoDS_Iterator` (direct
+children only, no internal recursion) — confirmed via the kernel probe to find the identical 26 solids,
+same volumes, as the old `TopExp_Explorer` version. The FIRST version of this replacement had a real,
+caught-by-regression-suite bug: it pushed each shape's children onto the frontier in iterator order, so
+popping them back off (a plain stack) visited the whole tree in REVERSE — same set of solids, wrong order.
+`solidIndex` order matters throughout this app (DocBodyRef, the tree's body list, "first body" UI
+conventions), so a silent reordering is a real regression, not a harmless reshuffle — caught by
+`verify-loft-into-existing.mjs` (unrelated to the huge file; a small, separate STEP fixture) failing after
+this fix landed, because a different, smaller solid ended up as `solidIndex 0` for that file. Fixed by
+pushing each level's children onto the frontier in REVERSE, so popping restores the original left-to-right
+order — confirmed via the kernel probe with an ORDER-sensitive (not just set) comparison against the huge
+file too: exact match against the original `TopExp_Explorer` traversal order.
+
+**Also fixed alongside (a real, if secondary, contributor to memory pressure on this same file, unrelated
+to the crash's actual root cause):** `tessellateSolid` built BOTH a coarse render triangulation and a much
+finer "Mesh View" wireframe-overlay triangulation for every body unconditionally at import time, regardless
+of whether Mesh View is ever turned on (off by default). Measured on the same 112MB file: the fine pass's
+tighter deflection produced a 7-20x triangle-count multiplier per body over the render pass, and the file's
+fine-pass TOTAL (6.4M triangles) came to ~10x its render-pass total (653K) — one body alone went from
+321,586 render triangles to 2,795,464 fine triangles. New `MESH_VIEW_MAX_RENDER_TRIS` threshold (50,000):
+above it, `tessellateSolid` skips the fine pass outright and reuses the render triangulation for Mesh View
+too (the same fallback the "fine pass threw" case already used, just triggered proactively by size instead
+of by a caught error) — measured to cut this file's total Mesh View triangle count from 6.4M to 1.2M (a
+5.2x reduction, from skipping the fine pass on just 3 of the file's 26 bodies). Confirmed this alone did
+NOT fix the reported crash (the destructor-recursion fix above was the actual cause) but is a real,
+independent, low-risk memory improvement worth keeping regardless — typical small-to-medium bodies (the
+large majority of real usage) are entirely unaffected by a 50,000-triangle threshold.
+
+**Verification for this pass:** all four fixes (Loft coincidence, `skipReaderDelete`, `explodeByType`'s
+iterative+order-correct traversal, `MESH_VIEW_MAX_RENDER_TRIS`) went through the same discipline as every
+prior pass — a standalone Node kernel probe first (confirming root cause and fix independent of the app),
+then the real fix in `step-loader.worker.ts`, then Playwright verification against the running app
+(`verify-loft-follows-face.mjs` updated with a real Volume assertion; the large STEP file re-imported
+successfully end-to-end through the real browser via a one-off Playwright script, all 26 bodies loading in
+~4 minutes with zero errors — the script itself was a diagnostic, not committed, since it needs an external
+112MB fixture file the repo can't reasonably carry), then a full regression sweep. Full sweep: all 17
+`verify-*.mjs` scripts, plus `tsc --noEmit` (worker and app), `ng build --configuration production`, and
+`ng test` (37/37). 16 of 17 verify scripts pass; the one failure (`verify-fillet-feature-tree.mjs`) is the
+already-documented, pre-existing Slice 5 WASM defect (`___cxa_is_pointer_type is not defined`) from the
+2026-09-14/15 entry, untouched by anything in this pass. `verify-loft-into-existing.mjs` briefly failed
+after the FIRST (order-bug) version of the `explodeByType` fix landed — see above; passes cleanly with the
+order-corrected version, with volume numbers matching the pre-fix baseline almost exactly (confirming the
+fix changes traversal robustness only, not which body ends up as which index).
+
+## Feature work (2026-09-24) — Hole Wizard counterbore/countersink, a `hole` feature kind, and a hole-edit bug that never reached the scene
+
+Picked from `context/CAD_FEATURE_CHECKLIST.md`'s Phase 3 list: counterbore/countersink was the one item whose
+blocker had already been removed (2026-09-22 entry) with only the tool solid left to build.
+
+**New `kind: 'hole'` feature, replacing the reuse of `kind: 'extrude'`.** A counterbore or countersink is not an
+extrude of one circle, so the 2026-09-22 "a hole IS an extrude cut" shortcut no longer fit. Added in all three
+places `FeatureRecord`'s docstring says must move together (worker `FeatureRecord`, `ClientFeatureRecord`,
+`feature.edit` params), plus a `feature.hole` request. `HoleFeatureParams` holds the type (`simple` |
+`counterbore` | `countersink`), hole diameter, the through-cut half-length (`depth`, computed from the body size
+as before), and counterbore diameter/depth and countersink diameter/angle. All of them are stored for every type,
+so switching type in an edit starts from sensible values. The committed sketch is still a single circle and
+supplies only the center and plane; its radius is ignored in favour of `params.diameter`, so an edit can
+change the size without committing a new sketch. The hole is face-anchored exactly as before.
+
+**Tool solid (`buildHoleToolSolid`).** A through-cylinder spanning `depth` both ways from the face (the same
+"cut both ways" guarantee Extrude uses), fused with a counterbore cylinder or a countersink cone
+(`BRepPrimAPI_MakeCylinder_3`/`MakeCone_3`, both taking a `gp_Ax2`; overloads confirmed in a Node kernel probe
+since this build has no typings). The entry feature sinks along the face's inward normal (the plane normal is
+outward, per `buildExtrudeToolSolid`'s comment). It also sticks out of the face by `max(0.5, 0.1·R)`, so its top
+cap is never exactly coplanar with the face (the degeneracy behind Loft's 2026-09-23 zero-volume cut). The
+extension is kept short rather than reusing `depth`, so a countersink cone on a recessed face can't widen into
+nearby walls above it. Node probe on a 100×60×20 box: simple, counterbore and 90° countersink cuts matched the
+analytical volumes to ~1e-11 mm³. The worker validates entry sizes (larger than the hole; countersink not deeper
+than `depth`) and returns a readable error. The panel checks the diameter rules too, and disables Apply.
+
+**Standard sizes.** `HoleSizePreset` gained a counterbore (socket head cap screw, ISO 4762 / ASME B18.3) and a
+countersink diameter (flat head, ISO 10642 at 90°, ASME B18.3 at 82°) per fastener size. These are the
+usual published table values, reset whenever standard/size changes, then freely editable.
+
+**Real bug found and fixed: hole edits never reached the scene.** `HoleWizardService.replaceBodyInScene`
+always minted a fresh body id, but edit replays find the body to update by `producesBodyId` (see
+`FilletChamferToolService`'s `idOverride`). So every Feature Tree edit of a hole since 2026-09-22 ran in the
+worker and was then silently dropped client-side. The 2026-09-22 verify script couldn't catch it: its edit made
+a through-cut deeper, which changes no volume either way. Also, its "Ctrl+Z leaves geometry consistent" check
+passed without the undo ever running. Fixed by passing `producesBodyId` as the body id. Edits now go through a new
+`HoleWizardService.commitEditOfHoleFeature`, serialized per feature like Fillet/Chamfer's.
+
+**Verification.** `verify-hole-wizard-feature-tree.mjs` rewritten to assert real numbers:
+- It edits hole #1 from simple to counterbore. The extra volume removed must match π(R²−r²)·depth.
+- The first run showed 304.1 mm³ removed against an expected 395.3. That was not a bug: hole #1's own volume
+  gives a plate thickness of exactly 5.00 mm, so the standard 6.5 mm counterbore went straight through, and
+  π(5.5²−3.3²)·5.0 = 304.1. The test now sets a depth of half the measured thickness. Result: 152.0 vs 152.1 mm³.
+- Ctrl+Z must restore the simple hole's volume exactly. It waits on the row reverting, not a fixed delay: the
+  undo replay queues behind `history.run()`'s own idempotent re-apply, and each replay re-reads the imported STEP
+  assembly, which takes longer than the old 2.5 s wait.
+- It places a counterbore (typed depth 3 mm) and a countersink on the same already-cut body. They removed
+  353.5 and 292.6 mm³, both exactly the hand-calculated values for a 5 mm plate.
+
+**Known gaps, not addressed:** blind (fixed-depth) and tapped holes; hole series/patterns; a counterbore
+deeper than the local part thickness silently becomes a wider through-hole (the worker only knows the body's
+overall size, not the thickness under the hole); no drawing callouts.
+
+**Full regression sweep:** `tsc --noEmit` (app and worker), `ng build --configuration production`, `ng test`
+(37/37), and all 17 `verify-*.mjs` scripts. 16 of 17 pass. The one failure (`verify-fillet-feature-tree.mjs`)
+is the same `___cxa_is_pointer_type is not defined` Slice 5 WASM defect already documented in the
+2026-09-14/15 entry. This pass did not touch it.
+
+## Feature work (2026-09-24) — Delete is undoable
+
+Checklist §M listed Delete as BROKEN because it could not be undone (the app's own confirm dialog said
+"This cannot be undone").
+
+**How.** `Viewport.deletePart` now runs through `HistoryService.run`. The redo step calls a new
+`TreeService.detachBody`. It removes the node like `deleteBody` does, but also returns the node itself
+(same id, `parentId`, `featureId`, `hasStepSource`, visibility) and its index among its siblings. The undo
+step calls `restoreBody`, which puts that node back at the same index, restores both lookup maps, and
+re-adds the same mesh. The mesh is still disposed on delete: Duplicate's and Pattern's undo/redo already
+re-add a disposed mesh, since three.js re-uploads the buffers on the next render. So there is no new
+GPU-lifetime scheme and no leak while a delete sits on the undo stack.
+
+Keeping the node id is what matters. Feature edits find a body by `producesBodyId`, and STEP re-reads
+climb `parentId` to the import and need `hasStepSource`. With the same node id and flags, a restored
+STEP part can still be cut, and a restored feature body can still be edited. The worker's feature
+history is never touched by a delete, so there is nothing to restore there. `restoreBody` does nothing if
+the parent import no longer exists (a later Open replaced the scene). The confirm dialog stays, now
+saying "(Ctrl+Z undoes this.)".
+
+**Verified** with the new `verify-delete-undo.mjs`:
+- Delete removes the part from both the tree and the scene.
+- Ctrl+Z brings back the identical node id list in the same order, with the same STEP-source flags and
+  every mesh mapped back to its node.
+- Ctrl+Y deletes it again, and a second Ctrl+Z restores it again.
+- A Hole Wizard hole cut into the restored part removes 171.06 mm³. That is identical to the same hole
+  on a never-deleted part (`CONTROL=1` mode), so the restored part's STEP source still resolves.
+
+The first version of that last check removed nothing in both the real run and the control run. It was a
+test bug: picking the face animates the camera, so a second click at the same pixel landed ~330 mm off
+the face. The test now re-projects the face origin through the settled camera.
+
+**Not addressed:** undo of geometry creation (Sketch → Extrude etc., primitives, Fillet/Shell/Draft) and
+of Open STEP. Deleting a feature body still leaves its Feature Tree row, which is unchanged behavior.
+
+## Feature work (2026-09-24) — Save / Open / New: a native project format (`.cadproj`)
+
+The #1 item in both `cad-gap-analysis.md` §7.1 and the checklist's Phase 1: before this, a page reload lost
+everything.
+
+**The design follows from where the model lives: in two places.** The client holds the meshes, tree and
+per-body properties. The session Worker holds the OCCT shapes that make features editable and feature-built
+parts cuttable. A project stores each one in the form that restores it faithfully:
+- **Client scene, as a snapshot.** The tree nodes (`TreeService.exportState`), and for every body its
+  render mesh (positions and indices, one entry shared by Pattern/Mirror/Duplicate copies that share a
+  geometry), `faceIdMap`, edge polylines, id, name, color, opacity, metalness/roughness, material, transform,
+  visibility and the stored volume/area/counts. Also the Feature Tree rows. Opening rebuilds exactly this
+  with no kernel work. So every kind of body comes back as it was: imported, feature-built, primitive,
+  Shell/Draft result, or copy. Each also keeps its current abilities, since those depend only on the node's
+  `featureId`/`hasStepSource` and the import source, all restored.
+- **Worker state, as a replay log.** `ModelingSessionService` now appends every `sketch.commit`,
+  feature-creation request and `feature.edit`, in post order, with status (`pending` / `ok` / `failed`).
+  `replay` sends them into a fresh session on open. Two decisions:
+  - **Edits are replayed, not collapsed into final params.** A sketch face-anchored to a feature that was
+    edited later is stored at its ORIGINAL plane position, and `reanchorSketch` shifts it at replay time.
+    Re-creating that sketch against the already-edited parent would build it in the wrong place.
+  - **Failed edits are replayed and expected to fail again.** `handleFeatureEdit` can apply part of a
+    failed edit (params mutated, some downstream features rebuilt), so skipping it would diverge.
+  Failed creates and sketch commits leave nothing in the worker, so they are dropped. Every create and edit
+  now goes through two helpers, `sendFeature`/`sendEdit`. The public method signatures are unchanged.
+- **Original STEP files**, stored once each, keyed by SHA-256. They back the restored import nodes (re-read
+  as `File`s, so cuts and fillets on imported parts keep working) and any logged feature that targeted
+  imported bytes. The log records imported targets as `{blob: sha256, solidIndex}`. `sendFeature` hashes the
+  bytes before posting, because posting transfers (detaches) the buffer. If a logged target's hash matches
+  no stored import, the log is saved as `null` and open warns that the feature history wasn't rebuilt,
+  rather than replaying something wrong.
+
+**Container.** ASCII `CADPROJ1`, a little-endian uint32 JSON length, the JSON header (`ProjectFile`), then a
+binary section the header points into with `{offset, length}`. The whole file is gzipped via
+`CompressionStream` where available; open sniffs the gzip magic and accepts both forms. There is no
+base64 anywhere, so a large STEP source doesn't balloon the file.
+
+**Open/New/Open STEP now share `ProjectService.resetDocument`.** It clears selection, gizmo, exploded view,
+scene, tree, Feature Tree, the undo stack, and the modeling session (with its log). This fixes a real bug:
+before, Open STEP left the Feature Tree rows, undo stack and session from the previous document in place.
+An Undo of an earlier Duplicate/Pattern could then register a part from the old document into the new
+tree. File → New asks first if parts are loaded. Open replays behind a blocking "Rebuilding feature
+history…" overlay, so the user can't edit mid-replay. If replay fails, the parts still show, and an alert
+says Feature Tree edits and cuts into feature-built parts won't work.
+
+**Save waits for running work.** The first test run was refused ("an operation is still running") seconds
+after a Feature Tree edit. That was `history.run()`'s idempotent second apply, with each hole replay
+re-reading the 17-body STEP assembly. Saving mid-operation would record a `pending` entry, so
+`ModelingSessionService.whenIdle` now waits behind a "Saving project…" overlay instead of refusing.
+
+**Test infrastructure note:** two earlier "first click on File hangs for 120 s" failures this session were a
+`<vite-error-overlay>` intercepting pointer events. The dev server had compiled a transient, half-edited
+state of a file mid-way through a multi-step edit. Playwright only named the element on the third
+occurrence. If a verify script times out on its very first click right after source edits, suspect this
+and rerun.
+
+**Also:** the project file input uses its own `project-file-input` class. Every verify script locates
+`input.hidden-file-input`, and a second match would fail all of them under Playwright's strict mode.
+
+**Verified** with the new `verify-project-save-open.mjs`, all through the UI:
+- It builds a document: STEP import, a Hole Wizard hole edited to a counterbore in the Feature Tree, a
+  renamed and recolored part, and a moved part.
+- Ctrl+S downloads `DM556MotorDriverAssembly.cadproj` (943 KB for the 17-body assembly including its STEP
+  source). Then it reloads the page, confirms the scene is empty, and opens the file.
+- Every body's node id, body id, name, color, volume, position and triangle count match the pre-save
+  snapshot exactly. The Feature Tree rows match, and the undo stack is empty.
+- Editing the counterbore back to a simple hole restores the pre-counterbore volume exactly
+  (4954840.59 mm³), so the kernel history really was rebuilt, not just the meshes.
+- A new hole into a never-modified imported part removes 170.1 mm³, so the STEP source was restored.
+
+**Not in v1:** autosave/crash recovery and a `beforeunload` guard; Save As (every save is a browser
+download); reference planes, the structural model, measurements, section planes and the undo history are
+not saved; Mesh View overlays (their fine triangulation isn't kept client-side, so reopen the STEP for
+Mesh View).
+
+**Second test, for the case that motivated replaying edits:** `verify-project-follows-face.mjs`
+builds `verify-feature-follows-face.mjs`'s scenario. A 20 mm block gets a boss sketched on its top face,
+then the block is edited to 60 mm and the boss follows to 70 mm. The test saves, reloads, and opens.
+The boss is still at 70 mm with the same volume. Editing the block again in the reopened document
+(to 40 mm) moves the boss to exactly 50 mm, with volume 2,645,005 mm³ matching the analytical value.
+That only works if the reopened session rebuilt the sketch's face anchor exactly as the original session
+had it. Revolve/sweep/loft/fillet use the same logging helpers but have no save/open-specific test.
+
+**Full regression sweep (after the Delete-undo and Save/Open work):** `tsc --noEmit`, `ng build --configuration
+production`, `ng test` (37/37), and all 19 `verify-*.mjs` scripts (including the new `verify-delete-undo.mjs`
+and `verify-project-save-open.mjs`; `verify-project-follows-face.mjs` was run separately and passes). 18 of 19
+pass. The one failure is the known `verify-fillet-feature-tree.mjs` Slice 5 WASM defect
+(`___cxa_is_pointer_type is not defined`), unchanged.

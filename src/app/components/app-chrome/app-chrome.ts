@@ -16,6 +16,7 @@ import { ExportService, downloadBlob } from '../../services/export.service';
 import { HistoryService } from '../../services/history.service';
 import { ObjectTransformService, TransformGizmoMode } from '../../services/object-transform.service';
 import { FeatureTreeService } from '../../services/feature-tree.service';
+import { ProjectService } from '../../services/project.service';
 import { Icon } from '../icon/icon';
 import { ViewPreset } from '../../models/view-preset.model';
 import { ShadingMode } from '../../models/viewport-settings.model';
@@ -40,6 +41,7 @@ interface MenuDef {
 })
 export class AppChrome {
   @Output() openStepFile = new EventEmitter<void>();
+  @Output() openProjectFile = new EventEmitter<void>();
 
   // --- Menu bar ---
   readonly openMenu = signal<string | null>(null);
@@ -110,12 +112,16 @@ export class AppChrome {
     private readonly history: HistoryService,
     private readonly objectTransform: ObjectTransformService,
     private readonly featureTree: FeatureTreeService,
+    private readonly project: ProjectService,
     private readonly elementRef: ElementRef<HTMLElement>
   ) {
     this.menus = [
       {
         label: 'File',
         items: [
+          { label: 'New', action: () => this.newDocument() },
+          { label: 'Open Project…', action: () => this.openProjectFile.emit() },
+          { label: 'Save Project (Ctrl+S)', action: () => void this.project.save() },
           { label: 'Open STEP…', action: () => this.openStepFile.emit() },
           { label: 'Export STEP…', action: () => void this.exportStep() },
           { label: 'Export STL…', action: () => this.exportStl() },
@@ -220,13 +226,23 @@ export class AppChrome {
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return; // don't hijack Ctrl+Z while editing a name/value field
 
     const key = event.key.toLowerCase();
-    if (key === 'z' && !event.shiftKey) {
+    if (key === 's') {
+      event.preventDefault(); // the browser's own "Save page as"
+      void this.project.save();
+    } else if (key === 'z' && !event.shiftKey) {
       event.preventDefault();
       this.history.undo();
     } else if (key === 'y' || (key === 'z' && event.shiftKey)) {
       event.preventDefault();
       this.history.redo();
     }
+  }
+
+  /** File → New: clears the document, asking first if there is anything to lose. */
+  newDocument(): void {
+    // eslint-disable-next-line no-alert
+    if (this.tree.allBodies().length > 0 && !confirm('Start a new document? Anything not saved with Save Project will be lost.')) return;
+    this.project.newDocument();
   }
 
   runAction(action: () => void): void {

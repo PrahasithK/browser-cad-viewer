@@ -1,16 +1,25 @@
 import { Injectable, signal } from '@angular/core';
 import { generateId } from '../utils/id-generator.util';
-import { DocBodyRef, FeatureCutTarget, FilletChamferEdgeValue, FilletChamferKind, PlaneRef, SketchEntity, StepWorkerRequest, StepWorkerResponse, WorkerTessellatedBody } from '../workers/step-worker-messages.model';
+import { sha256Hex } from '../utils/hash.util';
+import { DocBodyRef, FilletChamferEdgeValue, FilletChamferKind, HoleFeatureParams, PlaneRef, SketchEntity, StepWorkerRequest, StepWorkerResponse, WorkerTessellatedBody } from '../workers/step-worker-messages.model';
+import { FeatureCreateRequest, FeatureEditRequest, LoggedBodyRef, LoggedFeatureCreate, SessionLogEntry } from '../models/project.model';
 
 export interface FeatureResult {
   featureId: string;
   bodies: WorkerTessellatedBody[];
 }
 
+type EditParams = FeatureEditRequest['params'];
+
 /**
  * Owns a single long-lived worker + OCCT session for interactive sketch/feature authoring,
  * as opposed to StepLoaderService's one-shot worker-per-load used for viewing STEP imports.
  * The worker keeps its OCCT shape alive across calls so features can build on one another.
+ *
+ * Every sketch commit, feature creation and feature edit is also appended to a session log
+ * (`exportLog`), in the order the worker receives them. A saved project stores that log, and
+ * `replay` feeds it into a fresh session on open, rebuilding the worker's feature history exactly
+ * so features stay editable (see `SessionLogEntry` for why edits are replayed, not collapsed).
  */
 @Injectable({ providedIn: 'root' })
 export class ModelingSessionService {
@@ -21,6 +30,8 @@ export class ModelingSessionService {
 
   private pendingSketch = new Map<string, { resolve: (ok: boolean, error?: string) => void }>();
   private pendingFeature = new Map<string, { resolve: (r: FeatureResult) => void; reject: (err: Error) => void }>();
+
+  private log: SessionLogEntry[] = [];
 
   async start(): Promise<string> {
     if (this.sessionId()) return this.sessionId()!;
@@ -51,9 +62,14 @@ export class ModelingSessionService {
     const id = this.sessionId();
     if (!id || !this.worker) throw new Error('No active modeling session');
 
+    const entry: SessionLogEntry = { kind: 'sketch', sketchId, planeRef, entities, faceAnchorFeatureId, status: 'pending' };
+    this.log.push(entry);
     return new Promise((resolve) => {
       this.pendingSketch.set(sketchId, {
-        resolve: (ok, error) => resolve({ success: ok, error })
+        resolve: (ok, error) => {
+          entry.status = ok ? 'ok' : 'failed';
+          resolve({ success: ok, error });
+        }
       });
       const request: StepWorkerRequest = { type: 'sketch.commit', sessionId: id, sketchId, planeRef, entities, faceAnchorFeatureId };
       this.worker!.postMessage(request);
@@ -86,16 +102,8 @@ export class ModelingSessionService {
    * client's `FeatureTreeService`/`TreeNode.featureId` disagreed on every feature's identity).
    */
   async extrude(sketchId: string, depth: number, cut: boolean, targetBody?: DocBodyRef, producesBodyId?: string, featureId?: string): Promise<FeatureResult> {
-    const id = this.sessionId();
-    if (!id || !this.worker) throw new Error('No active modeling session');
-
-    const resolvedFeatureId = featureId ?? generateId('feature');
-    return new Promise((resolve, reject) => {
-      this.pendingFeature.set(resolvedFeatureId, { resolve, reject });
-      const request: StepWorkerRequest = { type: 'feature.extrude', sessionId: id, featureId: resolvedFeatureId, sketchId, depth, cut, targetBody, producesBodyId };
-      const transfer = targetBody?.kind === 'imported' ? [targetBody.bytes.buffer] : [];
-      this.worker!.postMessage(request, transfer);
-    });
+    const id = this.requireSession();
+    return this.sendFeature({ type: 'feature.extrude', sessionId: id, featureId: featureId ?? generateId('feature'), sketchId, depth, cut, targetBody, producesBodyId });
   }
 
   /**
@@ -106,26 +114,12 @@ export class ModelingSessionService {
    * `producesBodyId` so the caller can update every affected `CadBody` from one response.
    */
   async editExtrude(featureId: string, params: { depth: number; cut: boolean }): Promise<FeatureResult> {
-    const id = this.sessionId();
-    if (!id || !this.worker) throw new Error('No active modeling session');
-
-    return new Promise((resolve, reject) => {
-      this.pendingFeature.set(featureId, { resolve, reject });
-      const request: StepWorkerRequest = { type: 'feature.edit', sessionId: id, featureId, params: { kind: 'extrude', ...params } };
-      this.worker!.postMessage(request);
-    });
+    return this.sendEdit(featureId, { kind: 'extrude', ...params });
   }
 
   /** Revolve's counterpart of `editExtrude` — same shape, `params.kind` tags it for the worker's own validation. Added in Slice 2. */
   async editRevolve(featureId: string, params: { axis: 'u' | 'v'; angleDeg: number; cut: boolean }): Promise<FeatureResult> {
-    const id = this.sessionId();
-    if (!id || !this.worker) throw new Error('No active modeling session');
-
-    return new Promise((resolve, reject) => {
-      this.pendingFeature.set(featureId, { resolve, reject });
-      const request: StepWorkerRequest = { type: 'feature.edit', sessionId: id, featureId, params: { kind: 'revolve', ...params } };
-      this.worker!.postMessage(request);
-    });
+    return this.sendEdit(featureId, { kind: 'revolve', ...params });
   }
 
   /**
@@ -139,16 +133,8 @@ export class ModelingSessionService {
    * matters: it's what keeps the client and worker agreeing on this feature's identity.
    */
   async revolve(sketchId: string, axis: 'u' | 'v', angleDeg: number, cut?: boolean, targetBody?: DocBodyRef, producesBodyId?: string, featureId?: string): Promise<FeatureResult> {
-    const id = this.sessionId();
-    if (!id || !this.worker) throw new Error('No active modeling session');
-
-    const resolvedFeatureId = featureId ?? generateId('feature');
-    return new Promise((resolve, reject) => {
-      this.pendingFeature.set(resolvedFeatureId, { resolve, reject });
-      const request: StepWorkerRequest = { type: 'feature.revolve', sessionId: id, featureId: resolvedFeatureId, sketchId, axis, angleDeg, cut, targetBody, producesBodyId };
-      const transfer = targetBody?.kind === 'imported' ? [targetBody.bytes.buffer] : [];
-      this.worker!.postMessage(request, transfer);
-    });
+    const id = this.requireSession();
+    return this.sendFeature({ type: 'feature.revolve', sessionId: id, featureId: featureId ?? generateId('feature'), sketchId, axis, angleDeg, cut, targetBody, producesBodyId });
   }
 
   /**
@@ -160,28 +146,13 @@ export class ModelingSessionService {
    * docstring for why passing `featureId` explicitly matters.
    */
   async sweep(sketchId: string, axis: 'u' | 'v', tiltDeg: number, distance: number, cut?: boolean, targetBody?: DocBodyRef, producesBodyId?: string, featureId?: string): Promise<FeatureResult> {
-    const id = this.sessionId();
-    if (!id || !this.worker) throw new Error('No active modeling session');
-
-    const resolvedFeatureId = featureId ?? generateId('feature');
-    return new Promise((resolve, reject) => {
-      this.pendingFeature.set(resolvedFeatureId, { resolve, reject });
-      const request: StepWorkerRequest = { type: 'feature.sweep', sessionId: id, featureId: resolvedFeatureId, sketchId, axis, tiltDeg, distance, cut, targetBody, producesBodyId };
-      const transfer = targetBody?.kind === 'imported' ? [targetBody.bytes.buffer] : [];
-      this.worker!.postMessage(request, transfer);
-    });
+    const id = this.requireSession();
+    return this.sendFeature({ type: 'feature.sweep', sessionId: id, featureId: featureId ?? generateId('feature'), sketchId, axis, tiltDeg, distance, cut, targetBody, producesBodyId });
   }
 
   /** Sweep's counterpart of `editRevolve`/`editExtrude` — same shape, `params.kind` tags it for the worker's own validation. Added in Slice 3. */
   async editSweep(featureId: string, params: { axis: 'u' | 'v'; tiltDeg: number; distance: number; cut: boolean }): Promise<FeatureResult> {
-    const id = this.sessionId();
-    if (!id || !this.worker) throw new Error('No active modeling session');
-
-    return new Promise((resolve, reject) => {
-      this.pendingFeature.set(featureId, { resolve, reject });
-      const request: StepWorkerRequest = { type: 'feature.edit', sessionId: id, featureId, params: { kind: 'sweep', ...params } };
-      this.worker!.postMessage(request);
-    });
+    return this.sendEdit(featureId, { kind: 'sweep', ...params });
   }
 
   /**
@@ -194,28 +165,13 @@ export class ModelingSessionService {
    * face only, per `feature.loft`'s own docstring in step-worker-messages.model.ts.
    */
   async loft(sketchIds: string[], cut?: boolean, targetBody?: DocBodyRef, producesBodyId?: string, featureId?: string): Promise<FeatureResult> {
-    const id = this.sessionId();
-    if (!id || !this.worker) throw new Error('No active modeling session');
-
-    const resolvedFeatureId = featureId ?? generateId('feature');
-    return new Promise((resolve, reject) => {
-      this.pendingFeature.set(resolvedFeatureId, { resolve, reject });
-      const request: StepWorkerRequest = { type: 'feature.loft', sessionId: id, featureId: resolvedFeatureId, sketchIds, cut, targetBody, producesBodyId };
-      const transfer = targetBody?.kind === 'imported' ? [targetBody.bytes.buffer] : [];
-      this.worker!.postMessage(request, transfer);
-    });
+    const id = this.requireSession();
+    return this.sendFeature({ type: 'feature.loft', sessionId: id, featureId: featureId ?? generateId('feature'), sketchIds, cut, targetBody, producesBodyId });
   }
 
   /** Loft's counterpart of `editSweep`/`editRevolve`/`editExtrude` — deliberately the smallest params shape of the four (`{cut}` only), since Loft's v1 edit surface doesn't cover re-adding/removing/reordering profiles, only the Cut checkbox. Added in Slice 4. */
   async editLoft(featureId: string, params: { cut: boolean }): Promise<FeatureResult> {
-    const id = this.sessionId();
-    if (!id || !this.worker) throw new Error('No active modeling session');
-
-    return new Promise((resolve, reject) => {
-      this.pendingFeature.set(featureId, { resolve, reject });
-      const request: StepWorkerRequest = { type: 'feature.edit', sessionId: id, featureId, params: { kind: 'loft', ...params } };
-      this.worker!.postMessage(request);
-    });
+    return this.sendEdit(featureId, { kind: 'loft', ...params });
   }
 
   /**
@@ -228,29 +184,85 @@ export class ModelingSessionService {
    * `extrude()`'s docstring for why passing `featureId` explicitly matters.
    */
   async filletChamfer(kind: FilletChamferKind, targetBody: DocBodyRef, edges: FilletChamferEdgeValue[], producesBodyId?: string, featureId?: string): Promise<FeatureResult> {
-    const id = this.sessionId();
-    if (!id || !this.worker) throw new Error('No active modeling session');
-
-    const resolvedFeatureId = featureId ?? generateId('feature');
-    const resolvedProducesBodyId = producesBodyId ?? generateId('body');
-    return new Promise((resolve, reject) => {
-      this.pendingFeature.set(resolvedFeatureId, { resolve, reject });
-      const request: StepWorkerRequest = { type: 'feature.filletChamfer', sessionId: id, featureId: resolvedFeatureId, kind, targetBody, edges, producesBodyId: resolvedProducesBodyId };
-      const transfer = targetBody.kind === 'imported' ? [targetBody.bytes.buffer] : [];
-      this.worker!.postMessage(request, transfer);
+    const id = this.requireSession();
+    return this.sendFeature({
+      type: 'feature.filletChamfer',
+      sessionId: id,
+      featureId: featureId ?? generateId('feature'),
+      kind,
+      targetBody,
+      edges,
+      producesBodyId: producesBodyId ?? generateId('body')
     });
   }
 
   /** Fillet/Chamfer's counterpart of `editLoft`/`editSweep`/`editRevolve`/`editExtrude` — edits per-edge radius/distance values; the picked edge SET itself is fixed at creation, same restriction Loft's own profile set has. Added in Slice 5. */
   async editFilletChamfer(featureId: string, params: { filletChamferKind: FilletChamferKind; edges: FilletChamferEdgeValue[] }): Promise<FeatureResult> {
-    const id = this.sessionId();
-    if (!id || !this.worker) throw new Error('No active modeling session');
+    return this.sendEdit(featureId, { kind: 'filletChamfer', ...params });
+  }
 
-    return new Promise((resolve, reject) => {
-      this.pendingFeature.set(featureId, { resolve, reject });
-      const request: StepWorkerRequest = { type: 'feature.edit', sessionId: id, featureId, params: { kind: 'filletChamfer', ...params } };
-      this.worker!.postMessage(request);
-    });
+  /** Cuts a Hole Wizard hole (through, counterbore or countersink) into `targetBody` at the committed sketch's circle center. `producesBodyId`/`featureId` work exactly like `extrude()`'s own. */
+  async hole(sketchId: string, params: HoleFeatureParams, targetBody: DocBodyRef, producesBodyId: string, featureId: string): Promise<FeatureResult> {
+    const id = this.requireSession();
+    return this.sendFeature({ type: 'feature.hole', sessionId: id, featureId, sketchId, params, targetBody, producesBodyId });
+  }
+
+  /** Hole's counterpart of `editExtrude` — every size and the hole type are editable; the center and face are fixed at creation. */
+  async editHole(featureId: string, params: HoleFeatureParams): Promise<FeatureResult> {
+    return this.sendEdit(featureId, { kind: 'hole', ...params });
+  }
+
+  /** True while any request is still waiting on the worker — a save then would record an unfinished history. */
+  hasPendingWork(): boolean {
+    return this.pendingSketch.size > 0 || this.pendingFeature.size > 0;
+  }
+
+  /** Resolves once nothing is waiting on the worker (checked every 200 ms), or rejects after `timeoutMs`. */
+  async whenIdle(timeoutMs = 300_000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (this.hasPendingWork()) {
+      if (Date.now() > deadline) throw new Error('an operation is still running — try again once it finishes.');
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+
+  /** A copy of the session log for saving. Failed sketch commits and creates are dropped — they left nothing in the worker. */
+  exportLog(): SessionLogEntry[] {
+    return structuredClone(this.log.filter((e) => e.kind === 'edit' || e.status === 'ok'));
+  }
+
+  /**
+   * Rebuilds a saved session: starts a fresh one and sends every logged request again, in order.
+   * `blobs` supplies the STEP bytes behind each logged imported target. The replayed requests are
+   * logged again as they go, so the rebuilt session saves the same way. Results are discarded —
+   * the caller has already restored the meshes from the project file. Throws if a request that
+   * succeeded originally fails now, since everything after it would be built on the wrong shape.
+   */
+  async replay(entries: SessionLogEntry[], blobs: Map<string, Uint8Array>): Promise<void> {
+    const id = await this.start();
+    for (const entry of entries) {
+      if (entry.kind === 'sketch') {
+        const result = await this.commitSketch(entry.sketchId, entry.planeRef, entry.entities, entry.faceAnchorFeatureId);
+        if (!result.success) throw new Error(`Sketch ${entry.sketchId} could not be rebuilt: ${result.error ?? 'unknown error'}`);
+      } else if (entry.kind === 'create') {
+        const logged = entry.request.targetBody;
+        let targetBody: DocBodyRef | undefined;
+        if (logged?.kind === 'imported') {
+          const bytes = blobs.get(logged.blob);
+          if (!bytes) throw new Error(`Feature ${entry.request.featureId} targets a STEP file that isn't in this project`);
+          targetBody = { kind: 'imported', bytes: bytes.slice(), solidIndex: logged.solidIndex };
+        } else {
+          targetBody = logged;
+        }
+        await this.sendFeature({ ...entry.request, sessionId: id, targetBody } as FeatureCreateRequest, logged?.kind === 'imported' ? logged.blob : undefined);
+      } else {
+        try {
+          await this.sendEdit(entry.request.featureId, entry.request.params);
+        } catch (err) {
+          if (entry.status === 'ok') throw err;
+        }
+      }
+    }
   }
 
   dispose(): void {
@@ -264,6 +276,70 @@ export class ModelingSessionService {
     this.sessionId.set(null);
     this.pendingSketch.clear();
     this.pendingFeature.clear();
+    this.log = [];
+  }
+
+  private requireSession(): string {
+    const id = this.sessionId();
+    if (!id || !this.worker) throw new Error('No active modeling session');
+    return id;
+  }
+
+  /**
+   * Posts a feature-creation request and logs it. Imported STEP bytes are hashed BEFORE posting,
+   * because posting transfers (detaches) their buffer. `knownBlob` skips that hash when the caller
+   * already knows it (a replay).
+   */
+  private async sendFeature(request: FeatureCreateRequest, knownBlob?: string): Promise<FeatureResult> {
+    const target = request.targetBody;
+    let loggedTarget: LoggedBodyRef | undefined;
+    if (target?.kind === 'imported') {
+      loggedTarget = { kind: 'imported', blob: knownBlob ?? (await sha256Hex(target.bytes)), solidIndex: target.solidIndex };
+    } else {
+      loggedTarget = target;
+    }
+    if (!this.worker || this.sessionId() !== request.sessionId) throw new Error('No active modeling session');
+
+    const { sessionId: _sessionId, targetBody: _targetBody, ...rest } = request;
+    const entry: SessionLogEntry = { kind: 'create', request: { ...rest, ...(loggedTarget ? { targetBody: loggedTarget } : {}) } as LoggedFeatureCreate, status: 'pending' };
+    this.log.push(entry);
+
+    return new Promise((resolve, reject) => {
+      this.pendingFeature.set(request.featureId, {
+        resolve: (result) => {
+          entry.status = 'ok';
+          resolve(result);
+        },
+        reject: (err) => {
+          entry.status = 'failed';
+          reject(err);
+        }
+      });
+      const transfer = target?.kind === 'imported' ? [target.bytes.buffer] : [];
+      this.worker!.postMessage(request, transfer);
+    });
+  }
+
+  /** Posts a `feature.edit` request and logs it (with its outcome — see `SessionLogStatus`). */
+  private sendEdit(featureId: string, params: EditParams): Promise<FeatureResult> {
+    const id = this.requireSession();
+    const entry: SessionLogEntry = { kind: 'edit', request: { type: 'feature.edit', featureId, params }, status: 'pending' };
+    this.log.push(entry);
+
+    return new Promise((resolve, reject) => {
+      this.pendingFeature.set(featureId, {
+        resolve: (result) => {
+          entry.status = 'ok';
+          resolve(result);
+        },
+        reject: (err) => {
+          entry.status = 'failed';
+          reject(err);
+        }
+      });
+      const request: StepWorkerRequest = { type: 'feature.edit', sessionId: id, featureId, params };
+      this.worker!.postMessage(request);
+    });
   }
 
   private handleMessage(msg: StepWorkerResponse): void {

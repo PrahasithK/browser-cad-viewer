@@ -689,7 +689,18 @@ export class SketchService {
 
     const sketchId = generateId('sketch');
     const entities = this.buildEntities();
-    const commit = await this.session.commitSketch(sketchId, st.planeRef, entities);
+    // Same two fixes every other finish method already has (finishAndExtrude/Revolve/Sweep): the
+    // plane must be converted into the picked face's own body frame if that body has been
+    // moved/rotated (planeRefForTarget), and the sketch should be anchored to that face so a later
+    // edit of the feature that produced it carries this profile along (faceAnchorFeatureId).
+    // LoftToolService.addCurrentProfile snapshots st.pickedFace into CommittedLoftProfile right
+    // after this call returns, so profiles on different bodies/faces are each anchored correctly.
+    const commit = await this.session.commitSketch(
+      sketchId,
+      this.planeRefForTarget(st.planeRef, st.pickedFace),
+      entities,
+      this.faceAnchorFeatureId(st.pickedFace)
+    );
     if (!commit.success) {
       throw new Error(commit.error ?? 'Sketch commit failed');
     }

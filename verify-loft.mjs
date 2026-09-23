@@ -7,7 +7,7 @@ function assert(cond, msg) {
 }
 
 async function main() {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || undefined });
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   page.setDefaultTimeout(60000);
   const errs = [];
@@ -94,7 +94,10 @@ async function main() {
 
   const volText = await page.locator('.prop-row', { hasText: 'Volume' }).textContent();
   const facesText = await page.locator('.prop-row', { hasText: 'Faces' }).textContent();
-  const minText = await page.locator('.prop-row', { hasText: 'Min' }).textContent();
+  // Was `{ hasText: 'Min' }` — that substring now also matches the Mass Properties section's
+  // Material <select> (its flattened option text includes "Aluminium...", which contains "min"
+  // case-insensitively). Anchor on the prop-label being exactly "Min" instead.
+  const minText = await page.locator('.prop-row').filter({ has: page.locator('.prop-label', { hasText: /^Min$/ }) }).textContent();
   const maxText = await page.locator('.prop-row', { hasText: 'Max' }).textContent();
   log(`Loft result — ${facesText} | ${volText}`);
   log(`bbox min: ${minText} | max: ${maxText}`);

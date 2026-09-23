@@ -196,6 +196,7 @@
   color: #fff;
 }
 
-.hidden-file-input {
+.hidden-file-input,
+.project-file-input {
   display: none;
 }

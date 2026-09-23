@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { DocBodyRef, FeatureCutTarget, FeatureRecord, FilletChamferEdgeValue, FilletChamferKind, FilletChamferRequest, PlaneRef, PrimitiveSpec, SketchEntity, StepWorkerRequest, StepWorkerResponse, WorkerEdge, WorkerTessellatedBody } from './step-worker-messages.model';
+import { DocBodyRef, FeatureCutTarget, FeatureRecord, FilletChamferEdgeValue, FilletChamferKind, FilletChamferRequest, HoleFeatureParams, PlaneRef, PrimitiveSpec, SketchEntity, StepWorkerRequest, StepWorkerResponse, WorkerEdge, WorkerTessellatedBody } from './step-worker-messages.model';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type OcctModule = any;
@@ -25,6 +25,23 @@ const ANGULAR_DEFLECTION = 0.5;
  */
 const MESH_VIEW_LINEAR_DEFLECTION = 0.015;
 const MESH_VIEW_ANGULAR_DEFLECTION = 0.15;
+
+/**
+ * Above this many RENDER-pass triangles, `tessellateSolid` skips the fine Mesh View pass for that
+ * body entirely and reuses the render triangulation for it too (same fallback the "fine pass
+ * failed" case below already uses, just triggered proactively by size instead of by a thrown
+ * error). The fine pass's curvature-adaptive deflection is ~7x tighter than the render pass, which
+ * measured as a 7-20x triangle-count multiplier per body on a real, unusually large assembly (a
+ * 112MB, 26-solid partial vehicle STEP file) — one body alone went from 321,586 render triangles
+ * to 2,795,464 fine triangles, and the file's fine-pass total (6.4M triangles) came to ~10x its
+ * render-pass total (653K). Mesh View is an optional wireframe overlay (off by default) built
+ * unconditionally for every body at load time regardless of whether the user ever turns it on —
+ * for a body already this dense at the coarse deflection, the extra fine detail is imperceptible
+ * in a wireframe overlay anyway, so this trades a small amount of overlay crispness on unusually
+ * large/complex bodies for a large cut in peak memory during import, without affecting the (far
+ * more common) small-to-medium body case at all.
+ */
+const MESH_VIEW_MAX_RENDER_TRIS = 50000;
 
 /**
  * Worker-side counterpart of the client-facing `FeatureRecord` (step-worker-messages.model.ts) —
@@ -133,14 +150,49 @@ function stripCarriageReturns(buffer: Uint8Array): Uint8Array {
   return out;
 }
 
-function explodeByType(occt: OcctModule, shape: any, type: number): any[] {
+/**
+ * Collects every descendant shape of `shape` matching `type`. Deliberately NOT built on
+ * `TopExp_Explorer` (the usual OCCT idiom, still used elsewhere in this file for exploring within
+ * a single already-isolated solid) — `TopExp_Explorer`'s own internal traversal of a deeply nested
+ * compound tree recurses natively inside the WASM binary, one call per nesting level, which for a
+ * real, unusually large assembly (a 112MB, 26-solid partial vehicle STEP file, confirmed via a
+ * captured browser stack trace: a repeating cycle of the same 3 wasm-function frames) overflows a
+ * browser Worker's native stack — even though the exact same call succeeds instantly in Node.js,
+ * whose main thread gets a larger native stack for the same WASM binary. This walks one level at a
+ * time via `TopoDS_Iterator` (direct children only, no internal recursion) instead, using an
+ * explicit JS array as the frontier — depth is then bounded by heap memory, not native call-stack
+ * frames, so it can't overflow regardless of how deeply nested a file's product structure is.
+ *
+ * Each shape's children are pushed onto the frontier in REVERSE so that popping them back off (a
+ * plain array used as a stack) visits them in their ORIGINAL order — matching the left-to-right,
+ * depth-first order `TopExp_Explorer` itself visits in. This isn't just cosmetic: `solidIndex`
+ * (this function's whole reason for existing, via `explodeSolids`) is a stable identity used
+ * throughout this app — DocBodyRef, the tree's body list, "first body" UI conventions — so a
+ * traversal that quietly reorders which shape ends up first is a real regression, not a harmless
+ * reshuffle. Caught by `verify-loft-into-existing.mjs` failing after this function's first version
+ * (which pushed children in iterator order, visiting them in REVERSE overall) picked a different,
+ * much smaller body as bodyIndex 0 for the exact same file.
+ */
+function explodeByType(occt: OcctModule, shape: any, type: any): any[] {
   const results: any[] = [];
-  const explorer = new occt.TopExp_Explorer_2(shape, type, occt.TopAbs_ShapeEnum.TopAbs_SHAPE);
-  while (explorer.More()) {
-    results.push(explorer.Current());
-    explorer.Next();
+  const frontier: any[] = [shape];
+  while (frontier.length > 0) {
+    const current = frontier.pop();
+    if (current.ShapeType().value === type.value) {
+      results.push(current);
+      continue;
+    }
+    const children: any[] = [];
+    const it = new occt.TopoDS_Iterator_2(current, true, true);
+    while (it.More()) {
+      children.push(it.Value());
+      it.Next();
+    }
+    it.delete();
+    for (let i = children.length - 1; i >= 0; i--) {
+      frontier.push(children[i]);
+    }
   }
-  explorer.delete();
   return results;
 }
 
@@ -287,9 +339,14 @@ function tessellateSolid(occt: OcctModule, solid: any, index: number): WorkerTes
 
   const edges = extractEdges(occt, solid);
 
-  // Best-effort: if the fine pass fails for any reason, mesh-view can fall back to the render
-  // triangulation client-side rather than losing the whole body.
-  const fine = readTriangulation(occt, solid, MESH_VIEW_LINEAR_DEFLECTION, MESH_VIEW_ANGULAR_DEFLECTION);
+  // Best-effort: if the fine pass fails for any reason (or is skipped outright for an already-huge
+  // body — see MESH_VIEW_MAX_RENDER_TRIS above), mesh-view falls back to the render triangulation
+  // client-side rather than losing the whole body.
+  const renderTriCount = render.indices.length / 3;
+  const fine =
+    renderTriCount > MESH_VIEW_MAX_RENDER_TRIS
+      ? null
+      : readTriangulation(occt, solid, MESH_VIEW_LINEAR_DEFLECTION, MESH_VIEW_ANGULAR_DEFLECTION);
 
   let faceCount = 0;
   let edgeCount = 0;
@@ -1043,6 +1100,9 @@ async function handleFeatureEdit(req: Extract<StepWorkerRequest, { type: 'featur
       editedRecord.params = editParams;
     } else if (editedRecord.kind === 'filletChamfer' && editParams.kind === 'filletChamfer') {
       editedRecord.params = { filletChamferKind: editParams.filletChamferKind, edges: editParams.edges };
+    } else if (editedRecord.kind === 'hole' && editParams.kind === 'hole') {
+      const { kind: _kind, ...holeParams } = editParams;
+      editedRecord.params = holeParams;
     } else {
       throw new Error(`Feature ${req.featureId} is a '${editedRecord.kind}' feature — cannot edit it with '${editParams.kind}' params`);
     }
@@ -1078,6 +1138,24 @@ async function handleFeatureEdit(req: Extract<StepWorkerRequest, { type: 'featur
         continue;
       }
 
+      // A hole is always a cut into its (non-null) target, and has no Cut checkbox of its own.
+      if (record.kind === 'hole') {
+        const storedSketch = session.sketches.get(record.sketchId);
+        if (!storedSketch) {
+          throw new Error(`Feature ${record.featureId}'s sketch ${record.sketchId} is missing — cannot replay`);
+        }
+        const holeTool = buildHoleToolSolid(occt, reanchorSketch(occt, session, storedSketch), record.params);
+        const resultShape = cutOrFuseNewSolid(occt, holeTool, true, resolveDocBodyRef(occt, session, record.targetRef));
+
+        record.resultShape?.delete?.();
+        record.resultShape = resultShape;
+
+        const bodies = tessellateShapeBodies(occt, resultShape);
+        for (const b of bodies) b.producesBodyId = record.producesBodyId;
+        allResultBodies.push(...bodies);
+        continue;
+      }
+
       // Sketch resolution varies by kind, not just the solid-builder choice below: every kind
       // except Loft reads exactly one sketch (`record.sketchId`); Loft blends between 2+
       // (`record.sketchIds`) and needs ALL of them present to replay at all — checked up front as
@@ -1085,14 +1163,25 @@ async function handleFeatureEdit(req: Extract<StepWorkerRequest, { type: 'featur
       const isCutIntoExisting = record.params.cut && !!record.targetRef;
       let newSolid: OcctModule;
       if (record.kind === 'loft') {
+        // Loft only ever replays with `producesBodyId` set (the sole condition its own create
+        // path pushes a session.features record under — see handleFeatureLoft), so unlike the
+        // shared cut-only `isCutIntoExisting` above, Loft's own broadened Cut-OR-Fuse condition
+        // (see buildLoftToolSolid's docstring for why Fuse needs it too) simplifies to just
+        // whether a target is present at all.
+        const loftWillBooleanAgainstTarget = !!record.targetRef;
+        // Each profile is re-anchored independently (a no-op for one with no faceAnchor, e.g. a
+        // profile drawn on a datum plane) — not just the first: any profile drawn on a face of a
+        // feature-tree body should track that face if that feature is edited, the same as a
+        // single-sketch feature's own sketch does, even though only the FIRST profile's pickedFace
+        // additionally drives cut/fuse targeting (see buildLoftToolSolid's own docstring).
         const sketches = record.sketchIds.map((sketchId) => {
-          const sketch = session.sketches.get(sketchId);
-          if (!sketch) {
+          const storedSketch = session.sketches.get(sketchId);
+          if (!storedSketch) {
             throw new Error(`Feature ${record.featureId}'s profile ${sketchId} is missing — cannot replay`);
           }
-          return sketch;
+          return reanchorSketch(occt, session, storedSketch);
         });
-        newSolid = buildLoftToolSolid(occt, sketches, isCutIntoExisting);
+        newSolid = buildLoftToolSolid(occt, sketches, loftWillBooleanAgainstTarget);
       } else {
         const storedSketch = session.sketches.get(record.sketchId);
         if (!storedSketch) {
@@ -1123,6 +1212,95 @@ async function handleFeatureEdit(req: Extract<StepWorkerRequest, { type: 'featur
 
     const transfer: Transferable[] = allResultBodies.flatMap(bodyTransferList);
     post({ type: 'feature.result', sessionId: req.sessionId, featureId: req.featureId, bodies: allResultBodies, success: true }, transfer);
+  } catch (err) {
+    post({
+      type: 'feature.result',
+      sessionId: req.sessionId,
+      featureId: req.featureId,
+      bodies: [],
+      success: false,
+      error: err instanceof Error ? err.message : String(err)
+    });
+  }
+}
+
+/**
+ * Builds a Hole Wizard hole's cutting tool: a through-cylinder spanning `params.depth` both ways
+ * from the face (the same "cut both ways" guarantee `buildExtrudeToolSolid` uses for cuts), fused
+ * with a counterbore cylinder or countersink cone that sinks INTO the part along the face's
+ * inward normal (the sketch plane's normal is the picked face's OUTWARD normal — see
+ * `buildExtrudeToolSolid`'s own comment). The entry feature also pokes a short way OUT of the face,
+ * so its top cap is never coplanar with the face itself — the exact-coincidence degeneracy that
+ * made Loft's cut silently remove nothing (2026-09-23 entry). The extension is kept short rather
+ * than reusing `depth`, so a counterbore/countersink on a recessed face can't gouge nearby walls
+ * above it. Verified against analytical volumes in a Node kernel probe: simple, counterbore and
+ * 90° countersink cuts in a box all matched to ~1e-11 mm³.
+ */
+function buildHoleToolSolid(occt: OcctModule, sketch: { planeRef: PlaneRef; entities: SketchEntity[] }, params: HoleFeatureParams): OcctModule {
+  const circle = sketch.entities.find((e): e is Extract<SketchEntity, { type: 'circle' }> => e.type === 'circle');
+  if (!circle) throw new Error('Hole sketch has no center circle');
+  const { holeType, diameter, depth, cboreDiameter, cboreDepth, csinkDiameter, csinkAngleDeg } = params;
+  if (!(diameter > 0) || !(depth > 0)) throw new Error('Hole diameter must be greater than zero');
+
+  const geomPlane = resolveGeomPlane(occt, sketch.planeRef);
+  const center = planePoint(occt, geomPlane, circle.center[0], circle.center[1]);
+  const n = geomPlane.Axis().Direction();
+  const axisAt = (offsetAlongNormal: number) =>
+    new occt.gp_Ax2_3(new occt.gp_Pnt_3(center.X() + n.X() * offsetAlongNormal, center.Y() + n.Y() * offsetAlongNormal, center.Z() + n.Z() * offsetAlongNormal), n);
+
+  const radius = diameter / 2;
+  const through = new occt.BRepPrimAPI_MakeCylinder_3(axisAt(-depth), radius, 2 * depth).Shape();
+
+  if (holeType === 'counterbore') {
+    if (!(cboreDiameter > diameter)) throw new Error('Counterbore diameter must be larger than the hole diameter');
+    if (!(cboreDepth > 0) || cboreDepth >= depth) throw new Error('Counterbore depth must be greater than zero and less than the part thickness');
+    const cboreRadius = cboreDiameter / 2;
+    const extension = Math.max(0.5, cboreRadius * 0.1);
+    const cbore = new occt.BRepPrimAPI_MakeCylinder_3(axisAt(-cboreDepth), cboreRadius, cboreDepth + extension).Shape();
+    return cutOrFuseNewSolid(occt, cbore, false, through);
+  }
+
+  if (holeType === 'countersink') {
+    if (!(csinkDiameter > diameter)) throw new Error('Countersink diameter must be larger than the hole diameter');
+    if (!(csinkAngleDeg > 0) || csinkAngleDeg >= 180) throw new Error('Countersink angle must be between 0° and 180°');
+    const csinkRadius = csinkDiameter / 2;
+    const tanHalf = Math.tan((csinkAngleDeg * Math.PI) / 360);
+    const sinkDepth = (csinkRadius - radius) / tanHalf;
+    if (sinkDepth >= depth) throw new Error('Countersink is deeper than the part is thick — use a smaller diameter or a wider angle');
+    const extension = Math.max(0.5, csinkRadius * 0.1);
+    const cone = new occt.BRepPrimAPI_MakeCone_3(axisAt(-sinkDepth), radius, csinkRadius + extension * tanHalf, sinkDepth + extension).Shape();
+    return cutOrFuseNewSolid(occt, cone, false, through);
+  }
+
+  return through;
+}
+
+function handleFeatureHole(req: Extract<StepWorkerRequest, { type: 'feature.hole' }>): void {
+  const session = sessions.get(req.sessionId);
+  const sketch = session?.sketches.get(req.sketchId);
+  if (!session || !sketch) {
+    post({ type: 'feature.result', sessionId: req.sessionId, featureId: req.featureId, bodies: [], success: false, error: 'Sketch not found' });
+    return;
+  }
+
+  try {
+    const occt = session.occt;
+    const holeTool = buildHoleToolSolid(occt, sketch, req.params);
+    const resultShape = cutOrFuseNewSolid(occt, holeTool, true, resolveDocBodyRef(occt, session, req.targetBody));
+
+    session.features.push({
+      featureId: req.featureId,
+      kind: 'hole',
+      sketchId: req.sketchId,
+      params: req.params,
+      targetRef: req.targetBody,
+      producesBodyId: req.producesBodyId,
+      resultShape
+    });
+
+    const bodies = tessellateShapeBodies(occt, resultShape);
+    for (const b of bodies) b.producesBodyId = req.producesBodyId;
+    post({ type: 'feature.result', sessionId: req.sessionId, featureId: req.featureId, bodies, success: true }, bodies.flatMap(bodyTransferList));
   } catch (err) {
     post({
       type: 'feature.result',
@@ -1431,14 +1609,30 @@ function handleFeatureSweep(req: Extract<StepWorkerRequest, { type: 'feature.swe
  * mirroring exactly how `buildExtrudeToolSolid`/`buildRevolveToolSolid`/`buildSweepToolSolid` were
  * factored out in Slices 1-3, for the same reason: both the create path and the replay path need
  * to build this identical solid from scratch and must not drift into two copies. `isCutIntoExisting`
- * is accepted for signature symmetry with the other three builders but unused — Loft's tool solid
- * construction (`BRepOffsetAPI_ThruSections`, capped via `isSolid=true`) needs no symmetric-
- * both-directions trick the way Extrude/Revolve/Sweep's prism-based builders do, since a lofted
- * solid is already fully enclosed between its capped end profiles regardless of cut/fuse intent.
+ * doesn't need Extrude/Revolve/Sweep's symmetric-both-directions trick (a lofted solid is already
+ * fully enclosed between its capped end profiles regardless of cut/fuse intent) but DOES need its
+ * own fix for a different degeneracy: when a profile is sketched directly on the surface of the
+ * body it'll be cut/fused against (the natural face-anchored workflow), that profile's end cap
+ * lands exactly coplanar with the target's own boundary face. Confirmed via a standalone kernel
+ * probe (two on-surface profiles on adjacent faces of a box): `BRepAlgoAPI_Cut` treats this as a
+ * degenerate touching case and removes nothing at all (0.0 volume change, IsDone() true) rather
+ * than erroring, and Fuse adds far less than it should — both silently wrong, not a thrown error,
+ * so nothing upstream catches it. Nudging every wire a hair off its plane along the plane's own
+ * normal (LOFT_CUT_FUSE_EXTENSION) breaks the exact coincidence; the probe confirmed this is
+ * self-consistent (Cut's removed volume + Fuse's added volume ≈ the loft's own total volume) and
+ * that 0.01mm is dimensionally negligible for real parts while comfortably clearing float noise.
  */
 function buildLoftToolSolid(occt: OcctModule, sketches: { planeRef: PlaneRef; entities: SketchEntity[] }[], isCutIntoExisting: boolean): OcctModule {
-  void isCutIntoExisting;
-  const wires: OcctModule[] = sketches.map((sketch) => buildWireFromSketch(occt, sketch.planeRef, sketch.entities).wire);
+  const LOFT_CUT_FUSE_EXTENSION = 0.01;
+  const wires: OcctModule[] = sketches.map((sketch) => {
+    const { wire, geomPlane } = buildWireFromSketch(occt, sketch.planeRef, sketch.entities);
+    if (!isCutIntoExisting) return wire;
+    const dir = geomPlane.Axis().Direction();
+    const trsf = new occt.gp_Trsf_1();
+    trsf.SetTranslation_1(new occt.gp_Vec_4(dir.X() * LOFT_CUT_FUSE_EXTENSION, dir.Y() * LOFT_CUT_FUSE_EXTENSION, dir.Z() * LOFT_CUT_FUSE_EXTENSION));
+    const transformed = new occt.BRepBuilderAPI_Transform_2(wire, trsf, true).Shape();
+    return occt.TopoDS.Wire_1(transformed);
+  });
 
   // Unlike every other new OCCT class in this worker so far, this WASM build exposes
   // BRepOffsetAPI_ThruSections as a single un-suffixed constructor (no _1/_2 overload
@@ -1488,8 +1682,14 @@ function handleFeatureLoft(req: Extract<StepWorkerRequest, { type: 'feature.loft
       return sketch;
     });
 
-    const isCutIntoExisting = !!req.cut && !!req.targetBody;
-    const newSolid = buildLoftToolSolid(occt, sketches, isCutIntoExisting);
+    // True whenever the loft's result will actually be booleaned against an existing target
+    // below (an explicit `targetBody`, or the legacy implicit-target fallback to `session.shape`
+    // when the loft isn't producing its own standalone body) — covers Fuse-into-existing too, not
+    // just Cut, since both suffer the same on-surface-profile coincidence degeneracy documented on
+    // buildLoftToolSolid above. A standalone loft (`producesBodyId` set, no `targetBody`) is left
+    // untouched since there's no boolean op to guarantee overlap for.
+    const willBooleanAgainstTarget = !!req.targetBody || !req.producesBodyId;
+    const newSolid = buildLoftToolSolid(occt, sketches, willBooleanAgainstTarget);
 
     // Same target-resolution shape as handleFeatureExtrude/Revolve/Sweep's own — see their comments.
     let cutFuseTarget: OcctModule | null = null;
@@ -2067,6 +2267,9 @@ self.addEventListener('message', (event: MessageEvent<StepWorkerRequest>) => {
     case 'sketch.commit':
       handleSketchCommit(req);
       break;
+    case 'feature.hole':
+      handleFeatureHole(req);
+      break;
     case 'feature.extrude':
       handleFeatureExtrude(req);
       break;
@@ -2164,7 +2367,34 @@ function writeShapeToStepBytes(occt: OcctModule, shape: OcctModule): Uint8Array 
   return occt.FS.readFile(virtualPath);
 }
 
-function readStepShape(occt: OcctModule, rawBuffer: Uint8Array): { shape: OcctModule | null; lastStatus: number } {
+/**
+ * `skipReaderDelete` (default false, preserving the original always-clean-up behavior) exists
+ * because of one specific, confirmed failure mode: `reader.delete()`'s own embind-generated C++
+ * destructor recursively tears down the `STEPControl_Reader`'s entire owned entity graph (every
+ * parsed STEP record, released one nested Handle at a time), and for a large enough graph, that
+ * recursion overflows a browser Worker's native stack — confirmed via a captured browser stack
+ * trace against a real, unusually large STEP file (112MB, deeply cross-referenced): a
+ * `RangeError: Maximum call stack size exceeded` thrown from inside the WASM binary itself, not
+ * this file's own JS, immediately after `OneShape()` had already returned successfully. The exact
+ * same call succeeds instantly in a Node.js process, which gets a larger native stack for the
+ * identical WASM binary.
+ *
+ * This is only safe to skip where the caller's own Worker is about to be discarded wholesale
+ * anyway — `handleLoad` passes `true` because `StepLoaderService.loadStepFile`/
+ * `loadStepFileFromBlob` create a fresh, single-use Worker per call and unconditionally
+ * `.terminate()` it afterwards (every exit path: success, error, `worker.onerror`), so the entire
+ * Worker heap — WASM linear memory included — is torn down by the browser moments later
+ * regardless; an undeleted reader there is memory that was about to be freed in bulk anyway, not a
+ * real leak. Every OTHER caller of this function runs inside the long-lived per-session Worker
+ * (`ModelingSessionService`'s, alive for the whole editing session, potentially hundreds of
+ * operations) resolving much smaller re-exported STEP bytes for a single already-isolated body —
+ * those keep the default `false` and always clean up, since skipping there would accumulate a
+ * real leak across a long session rather than trading one for a moment. A user who imports a file
+ * this large and then performs a feature-tree operation that re-resolves its original STEP bytes
+ * inside that session Worker could in principle hit this same overflow there too — not addressed
+ * here; this fix covers the import path specifically, which is where the failure was reported.
+ */
+function readStepShape(occt: OcctModule, rawBuffer: Uint8Array, skipReaderDelete = false): { shape: OcctModule | null; lastStatus: number } {
   const buffer = stripCarriageReturns(rawBuffer);
   let shape: OcctModule | null = null;
   let lastStatus = -1;
@@ -2178,13 +2408,13 @@ function readStepShape(occt: OcctModule, rawBuffer: Uint8Array): { shape: OcctMo
     lastStatus = status.value;
 
     if (status.value !== occt.IFSelect_ReturnStatus.IFSelect_RetDone.value) {
-      reader.delete();
+      if (!skipReaderDelete) reader.delete();
       continue;
     }
 
     reader.TransferRoots();
     shape = reader.OneShape();
-    reader.delete();
+    if (!skipReaderDelete) reader.delete();
   }
 
   return { shape, lastStatus };
@@ -2199,7 +2429,11 @@ async function handleLoad(req: Extract<StepWorkerRequest, { type: 'load' }>): Pr
     const rawBuffer = new Uint8Array(await response.arrayBuffer());
 
     const occt: OcctModule = await initOcct();
-    const { shape, lastStatus } = readStepShape(occt, rawBuffer);
+    // skipReaderDelete=true — see readStepShape's own docstring: this Worker is single-use and
+    // gets terminated right after this call resolves either way, so skipping the STEP reader's own
+    // cleanup here trades a moment-early leak (freed in bulk anyway) for avoiding a confirmed
+    // native-stack overflow in its destructor on unusually large, deeply cross-referenced files.
+    const { shape, lastStatus } = readStepShape(occt, rawBuffer, true);
 
     if (!shape) {
       post({ type: 'error', message: `Failed to read STEP file (IFSelect_ReturnStatus=${lastStatus})` });
@@ -2235,7 +2469,7 @@ async function handleLoad(req: Extract<StepWorkerRequest, { type: 'load' }>): Pr
       }
     }
 
-    shape.delete();
+    // shape.delete() intentionally skipped too, same reasoning as skipReaderDelete above.
     post({ type: 'done', bodyCount: emitted });
   } catch (err) {
     post({ type: 'error', message: err instanceof Error ? err.message : String(err) });

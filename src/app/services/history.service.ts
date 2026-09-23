@@ -7,9 +7,10 @@ const MAX_HISTORY = 100;
  * Generic undo/redo command stack. Scope (v1): trivially-reversible property edits only
  * (rename, visibility, color, opacity, position, section plane config) — each command
  * captures the old/new value itself, so undo/redo here is just re-invoking the same setter
- * with the other value. Deletes and OCCT feature creation (sketch extrude, primitives) are
- * NOT wrapped: those dispose GPU resources / mutate the worker's OCCT shape in place with no
- * snapshot to restore, and need their own design (see architecture.md's undo/redo scoping note).
+ * with the other value. Delete is wrapped too (since 2026-09-24 — `Viewport.deletePart` keeps the
+ * detached tree node and mesh in the command's closure). OCCT feature creation (sketch extrude,
+ * primitives) is NOT wrapped: it mutates the worker's OCCT shape in place with no snapshot to
+ * restore, and needs its own design (see architecture.md's undo/redo scoping note).
  */
 @Injectable({ providedIn: 'root' })
 export class HistoryService {

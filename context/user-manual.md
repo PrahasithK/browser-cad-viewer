@@ -113,7 +113,8 @@ This is the normal way to bring an existing CAD part or assembly into the applic
    automatically frames the whole model.
 
 **Important — "Open" replaces, it does not add.** Opening a second STEP file clears whatever is
-currently loaded (geometry, selection, and tree) before loading the new one. This matches the
+currently loaded (geometry, selection, tree, Feature Tree and the Undo list) before loading the new
+one. This matches the
 "Open a document" convention in most desktop software — think of it like opening a new file in a
 text editor, not inserting into the current one. If you need multiple separate parts in one
 scene, build them up using the in-app creation tools (Sketch/Extrude, primitives) rather than by
@@ -123,6 +124,13 @@ bodies.
 **Sample files:** `public/assets/*.STEP` on disk are just example files provided for you to try —
 they are not loaded automatically and behave exactly like any file you'd pick from your own
 computer.
+
+**Large files:** files in the 100+ MB range (a full or partial assembly with many parts) can take
+several minutes to load — the loading dialog's status text will keep updating through parsing and
+tessellation, so a long wait with active progress is normal, not a hang. Very large, deeply
+detailed individual bodies within such a file may show a slightly coarser wireframe in Mesh View
+(§6.4) than smaller bodies do, as a deliberate tradeoff to keep memory usage manageable; the
+normal shaded view is unaffected.
 
 ### 3.3 Looking around the model (camera navigation)
 
@@ -299,8 +307,10 @@ an interactive on-screen gizmo:
 You can also delete a part via its **trash icon** in the Model Tree row, or by selecting it and
 pressing **Delete** or **Backspace**.
 
-**Deletion cannot be undone** — a confirmation dialog always appears first. This is different
-from every other edit in the app (rename, color, move, etc.), which are all undoable.
+A confirmation dialog appears first. **Deletion is undoable** (since 2026-09-24): **Ctrl+Z** puts
+the part back exactly where it was in the Model Tree. It's still usable for everything it was
+before: a STEP-imported part can still be cut or filleted, and a feature-tree part can still be
+edited in the Feature Tree. **Ctrl+Y** deletes it again.
 
 **Need more than one copy, arranged in a row or a circle?** Duplicate above only ever makes a
 single offset copy. For several evenly-spaced copies at once — a row of bolt holes, a bolt
@@ -349,9 +359,9 @@ though the sketch profile itself still can't be changed, only those parameters. 
 operation — placing a primitive, Fillet/Chamfer, Hole Wizard, Shell, Draft, Pattern, Mirror — is
 still final the moment you apply it, with no later "double-click and edit" step at all. If you need
 a different result from one of those, delete the
-body (if undoable, via Undo — otherwise via the trash icon, with the caveat that geometry creation/
-deletion is not on the Undo stack — see §4.3, though Pattern and Mirror are both **notable
-exceptions**: both are undoable — see §5.4/§5.5) and redo the operation with new inputs.
+body (if undoable, via Undo — otherwise via the trash icon; deleting is itself undoable, but
+geometry creation mostly isn't on the Undo stack — see §4.3, though Pattern and Mirror are both
+**notable exceptions**: both are undoable — see §5.4/§5.5) and redo the operation with new inputs.
 
 ### 3.10 Reviewing your work: measuring, sectioning, exploding
 
@@ -366,9 +376,32 @@ exceptions**: both are undoable — see §5.4/§5.5) and redo the operation with
 
 ### 3.11 Saving your work / exporting
 
-**There is still no "Save Project"** — the application has no concept of a project file, and
-closing the tab or reloading the page discards everything with no prompt or recovery. But you
-**can** export your model as a real CAD file at any point in a session:
+**Saving a project (since 2026-09-24).** Use **File → Save Project** or **Ctrl+S** to download
+your whole document as a `.cadproj` file. Use **File → Open Project…** to pick one and carry on
+exactly where you left off. The file name comes from your STEP file (e.g.
+`DM556MotorDriverAssembly.cadproj`), or `untitled.cadproj`. The browser saves it to your normal
+Downloads folder.
+
+What a project keeps:
+- Every part, whatever made it, with its name, color, transparency, material, position and
+  visibility, and the Model Tree as it was.
+- The **Feature Tree**, still editable. Opening rebuilds each feature's history in the geometry
+  kernel (a "Rebuilding feature history…" dialog shows while it runs), so you can double-click a
+  feature and change it exactly as before saving.
+- The original STEP file, so you can still cut into, fillet or put a hole in imported parts.
+
+What a project doesn't keep yet: reference planes, the structural model, measurements, section
+planes, the undo history (a reopened project starts with an empty Undo list), and Mesh View
+overlays (re-open the STEP file if you need Mesh View).
+
+Saving waits for any operation that's still running (for example a Feature Tree edit on a large
+part) to finish first, with a "Saving project…" dialog in the meantime.
+
+**File → New** clears everything and starts an empty document, asking first if there are parts
+loaded. **Closing or reloading the tab still discards unsaved work without a prompt**, and there's
+no autosave yet, so save before you close.
+
+You can also export your model as a CAD file for use in other programs:
 
 - **File → Export STEP…** — writes every currently-loaded body that qualifies (see below) into
   one combined STEP file and downloads it as `export.step`. This is a real, re-openable CAD file
@@ -476,8 +509,8 @@ same way, though not every combination of two different kinds has had equally di
 - **Loft's own edit surface is narrower than the other three: only the Cut checkbox.** You can't
   add, remove, or reorder a Loft's cross-section profiles after the fact through this panel — if
   you need a different set of profiles, delete the body and redo the Loft from scratch (§5.11).
-- Feature Tree entries only exist for the current browser session — closing or reloading the tab
-  loses them the same way it loses everything else not yet exported (§3.11).
+- Feature Tree entries are saved with **File → Save Project** and stay editable after **Open
+  Project…** (§3.11). Closing or reloading the tab without saving loses them.
 
 **A Feature Tree edit IS on the Undo stack** (§4.3): press **Ctrl+Z** right after clicking Apply
 and the feature (and anything built on top of it) reverts to its value before that edit, with the
@@ -528,7 +561,8 @@ separator, Screenshot / Fullscreen / Dark Mode toggle.
 - **Covered by Undo/Redo:** rename, visibility toggle, color change, opacity change, material
   assignment, Move/
   Rotate/Scale gizmo drags, section-plane offset/enable/flip, Duplicate, Pattern (every copy from
-  one Apply undoes/redoes together as a single step — see §5.4), Mirror (see §5.5), and **Feature
+  one Apply undoes/redoes together as a single step — see §5.4), Mirror (see §5.5), **deleting a
+  part** (Undo puts it back in the same place in the Model Tree, still fully usable), and **Feature
   Tree edits** — editing an Extrude/Revolve/Sweep/Loft's parameters afterward through the Feature
   Tree panel (§3.13) is a real Undo step: Ctrl+Z reverts it (and correctly recomputes any
   downstream feature built on top of it), Ctrl+Y redoes it. A Loft's own recompute can take a few
@@ -538,7 +572,6 @@ separator, Screenshot / Fullscreen / Dark Mode toggle.
 - **NOT covered by Undo/Redo** (these are permanent the moment you do them — this is about the
   CREATION of the geometry; if it's Extrude, Revolve, Sweep, or Loft, a later edit of its params
   through the Feature Tree panel is still a separate, undoable action, per the bullet above):
-  - Deleting a part (always asks for confirmation first instead)
   - Opening a STEP file (replaces the whole scene)
   - Sketch → Extrude, Revolve, Sweep, or Loft (creating new geometry — editing an already-created
     one afterward is covered, see above)
@@ -572,6 +605,7 @@ separator, Screenshot / Fullscreen / Dark Mode toggle.
 | **Ctrl+A** | Select all bodies |
 | **Ctrl+Z** | Undo |
 | **Ctrl+Y** | Redo |
+| **Ctrl+S** | Save Project (§3.11) |
 
 Shortcuts are disabled while you're typing in any text field, number field, or rename box (so
 typing "s" into a name field doesn't accidentally toggle Sketch). You can also open this same list
@@ -985,8 +1019,10 @@ reflected copy, one **Ctrl+Y** restores it.
 ### 5.6 Hole Wizard (standard fastener-size holes)
 
 **What it does:** Cuts a standard-size through-hole for a common metric or inch fastener directly
-into a picked face — no need to sketch a circle by hand, look up a clearance diameter, or guess a
-cut depth deep enough to punch all the way through.
+into a picked face — plain, **counterbored** (a wider, flat-bottomed recess for a socket head cap
+screw) or **countersunk** (a conical recess for a flat head screw) — with no need to sketch a circle
+by hand, look up a clearance or counterbore size, or guess a cut depth deep enough to punch all the
+way through.
 
 **Where to find it:** Ribbon → Features group → **Hole Wizard**.
 
@@ -1009,8 +1045,17 @@ up or guess the right diameter yourself.
      3/8-16).
    - **Fit** — Close, Normal, or Loose, each a slightly different clearance-hole diameter for the
      same fastener size (Normal is a reasonable default for most mounting holes).
+   - **Type** — Simple, Counterbore, or Countersink.
+     - **Counterbore** adds **C'bore Ø** and **C'bore depth** fields, pre-filled with the usual
+       socket-head-cap-screw values for the chosen size (e.g. M6: Ø11 × 6.5 mm).
+     - **Countersink** adds **C'sink Ø** and **C'sink angle** fields, pre-filled for a flat head
+       screw of the chosen size (e.g. M6: Ø12.6 mm at 90°; inch sizes use 82°).
+     - Changing Standard or Size resets these to that size's standard values. After that you can
+       type any value.
+     - The counterbore/countersink diameter must be larger than the hole itself. If it isn't, a red
+       message explains why and **Apply Hole** stays disabled.
    - A live readout shows the resulting **hole diameter** in mm, and a live preview circle appears
-     on the part at the chosen size.
+     on the part at the chosen size (two concentric circles for a counterbore/countersink).
 5. Click **Apply Hole**. The button reads "Cutting…" while the operation runs.
 6. On success, the panel closes automatically and the part updates in place in the tree (same name,
    same position — not a new body), with the hole cut all the way through automatically — you never
@@ -1021,22 +1066,25 @@ up or guess the right diameter yourself.
 **Output:** the target part's geometry is replaced in place with the hole cut through it.
 
 **Limitations:**
-- **Only works on parts that came from an opened STEP file, and only if that part hasn't already
-  been cut, filleted, or chamfered** — same restriction Fillet/Chamfer (§5.3) and Sketch's cut-into-
-  an-existing-part path (§5.1) both already have, and for the same reason: the tool needs to
-  re-read a real, unmodified STEP solid, which a body that's already been cut once no longer has.
-  You'll see a clear error message if you try on an unsupported part.
-- **Through-holes only** — there is no counterbore, countersink, or tapped/threaded hole option
-  yet. Cutting a counterbore needs a second, different-diameter cut into the same hole, which this
-  application's cut pipeline doesn't yet support doing twice into one part (see §11 for the
-  underlying gap).
+- **Works on a STEP-imported part, including one that's already been cut once** (by a sketch cut,
+  another Hole Wizard hole, or an Extrude/Revolve/Sweep) — earlier versions of this manual said a
+  part could only take ONE such operation ever; that's no longer true for these tools. It does
+  **not** yet work on a part that's been through Fillet/Chamfer, Shell, or Draft, or on a
+  sketch/primitive-created part — those tools don't yet register the part as editable, so the same
+  re-read-a-STEP-solid restriction still applies to them specifically.
+- **Always through-all.** There are no blind (fixed-depth) holes and no tapped/threaded holes yet —
+  this app has no thread modeling anywhere.
+- **A counterbore deeper than the part is thick goes straight through.** The part then gets one
+  wide hole instead of a stepped one, and no warning is shown. This is easy to hit on thin plates:
+  the standard M6 counterbore depth is 6.5 mm, so on a 5 mm plate, lower the C'bore depth. A
+  countersink that would be deeper than the whole part is rejected with an error.
 - One hole per Apply, and no bolt-pattern/multi-hole mode — Hole Wizard modifies the target part in
   place rather than producing a separate body, so Pattern (§5.4) has nothing separate to array-copy
   after one hole is cut. Each hole today needs its own Hole Wizard pass.
-- No Feature Tree entry (§3.13 — that panel covers Extrude, Revolve, Sweep, and Loft only) — once applied, you
-  can't come back later and change the hole's size without starting over.
-- Not on the Undo stack (§4.3) — same as Sketch/Fillet-Chamfer, since it's a geometry-creating
-  operation.
+- **Has a Feature Tree entry** (§3.13), labeled "Hole (size, fit)", "Counterbore (size, fit)" or
+  "Countersink (size, fit)". Double-click it afterward to change the hole's type, its diameter,
+  or its counterbore/countersink sizes; the edit is a normal Undo/Redo step. The hole's face and
+  center are fixed once it's cut; to move a hole, delete the body and redo it.
 
 **Recovering from a failed Hole Wizard cut:** if you see an error after picking a face, it means
 that part doesn't have a usable STEP source (already cut/filleted once, or created via Sketch/a
@@ -1287,6 +1335,11 @@ on a picked face.
   an existing part, that part's face must be where you draw profile 1. Later profiles can be on
   any plane (that's the whole point — a different plane per profile is what lets the loft twist
   or change cross-section shape); they never redirect which part gets cut/fused.
+- **Rare, occasional Loft Cut/Fuse failure** on profiles centered on two adjacent, perpendicular
+  faces (e.g. a profile on a part's top face and another on the immediately adjacent side face) —
+  the underlying blend calculation can be numerically sensitive for this specific arrangement and,
+  very occasionally, produce a result with no real volume change. If this happens, try moving one
+  of the profiles slightly off the shared corner, or picking faces that aren't directly adjacent.
 - **Straight blend only** — there's no way to guide the blend along a separately-drawn rail/guide
   curve, and no way to make the loft close back on itself (blend from the last profile back to the
   first, for a closed torus-like shape).
@@ -1691,9 +1744,10 @@ stack.
 | Export STEP with nothing loaded, or nothing qualifies | "Nothing to export — no bodies have a retained STEP source…" | Load a STEP file first, or use Export STL… instead |
 | Export STEP with some non-STEP-sourced bodies present | The file still downloads, then a message lists exactly which bodies were left out and why | Use Export STL… instead if you need every body included |
 | Feature Tree edit fails (e.g. a new depth/angle produces invalid geometry) | An error message in the edit form | The form stays open with your edit still in progress — adjust the value and click Apply again |
-| Deleting a part | A confirmation dialog ("Delete part "X"? This cannot be undone.") | Confirm only if you're sure — there is no Undo for deletion |
-| Attempting to Undo a delete/create operation | Nothing happens — those operations aren't tracked | See §4.3 for the exact list of what's undoable |
-| Closing/reloading the browser tab | No warning — all in-session work is lost immediately | Export (§6.8) or take a screenshot before closing if you need to keep the model or a visual record |
+| Deleting a part | A confirmation dialog ("Delete part "X"? (Ctrl+Z undoes this.)") | Confirm; if it was a mistake, press Ctrl+Z to put the part back |
+| Attempting to Undo a create operation | Nothing happens — most geometry creation isn't tracked | See §4.3 for the exact list of what's undoable |
+| Closing/reloading the browser tab | No warning — unsaved work is lost immediately (no autosave yet) | Save Project (Ctrl+S, §3.11) before closing |
+| Opening a project whose feature history can't be rebuilt | "The parts opened, but their feature history couldn't be rebuilt…" | The parts are fine to view, measure and export; Feature Tree edits and cuts into feature-built parts won't work in that session |
 
 ---
 
@@ -1729,7 +1783,8 @@ under "Implemented" below.
   configurable count/spacing/angle, undoable as a single step
 - **Mirror** — reflect any part across a global XY/YZ/XZ datum plane, undoable as a single step
 - **Hole Wizard** — standard metric/inch fastener clearance through-holes (M3–M12, #4-40–3/8-16),
-  cut into a picked face with automatic full-depth punch-through
+  plain, counterbored or countersunk, cut into a picked face with automatic full-depth
+  punch-through; type and sizes stay editable in the Feature Tree
 - **Reference Plane** — a named, offset plane from a datum or a picked face, reusable as a Sketch
   target (offset-only; no tilt or 3-point definition yet)
 - **Shell** — hollow out a STEP-imported part to a wall thickness, removing one or more picked
@@ -1761,7 +1816,8 @@ under "Implemented" below.
   members, supports, load cases/combinations, results diagrams)
 - **Feature Tree** — Extrude, Revolve, Sweep, and Loft features can be double-clicked afterward to
   edit their parameters (depth, axis/angle, or tilt/distance for the first three; just Cut for
-  Loft) and re-apply; a downstream feature that cuts into or fuses onto an edited feature's own
+  Loft) and re-apply — as can Hole Wizard holes (type, diameter, counterbore/countersink sizes)
+  and Fillet/Chamfer (per-edge values); a downstream feature that cuts into or fuses onto an edited feature's own
   output automatically recomputes against the new geometry (§3.13). **The edit itself is a real
   Undo/Redo step** (Ctrl+Z/Ctrl+Y — see §4.3). Every other tool remains final-once-applied.
 
@@ -1772,8 +1828,8 @@ Based on the project's own documented gap analysis against professional CAD tool
 - **Parametric feature tree, full coverage** — a Feature Tree exists and covers Extrude, Revolve,
   Sweep, and Loft (§3.13: edit depth/axis/angle/tilt/distance/cut — or just Cut, for Loft — after
   the fact, with correct downstream recomputation, and the edit itself is undoable — see §4.3), but
-  every other tool — primitives, Fillet/Chamfer, Hole Wizard, Shell, Draft, Pattern, Mirror — is
-  still final once applied, with no equivalent editing step at all. Extending coverage to the
+  every other tool apart from Hole Wizard and Fillet/Chamfer — primitives, Shell, Draft, Pattern,
+  Mirror — is still final once applied, with no equivalent editing step at all. Extending coverage to the
   remaining tools remains
   open. This is still the single largest structural gap overall, just no longer a 0%-covered one.
   It's also why STEP export still can't include a body once it's been Cut into or run through
@@ -1789,10 +1845,9 @@ Based on the project's own documented gap analysis against professional CAD tool
   (2D) patterns — Mirror (§5.5) exists but only across the 3 fixed global datum planes, Linear and
   Circular Pattern (§5.4) are implemented, but there's no arbitrary-direction/curve-following
   pattern and no way to skip individual positions within a pattern.
-- **Hole Wizard counterbore/countersink and tapped/threaded holes** — Hole Wizard (§5.6) exists but
-  covers standard through-holes only; counterbore/countersink need a second cut into the same part,
-  which the underlying cut pipeline can't yet do, and tapped holes need thread modeling, which
-  doesn't exist anywhere in this app.
+- **Blind and tapped/threaded holes** — Hole Wizard (§5.6) covers through-holes (plain,
+  counterbore, countersink) only; tapped holes need thread modeling, which doesn't exist anywhere
+  in this app.
 - **Curved-path Sweep and guide-curve/closed Loft** — Revolve, Sweep, and Loft (§5.1, §5.11) can
   all now cut into or fuse onto an existing part (via a picked-face profile + the Cut checkbox),
   but Sweep is still straight-line-only (no path along a picked edge or a second sketch yet), and

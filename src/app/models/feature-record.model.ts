@@ -1,4 +1,4 @@
-import { FilletChamferEdgeValue, FilletChamferKind } from '../workers/step-worker-messages.model';
+import { FilletChamferEdgeValue, FilletChamferKind, HoleFeatureParams } from '../workers/step-worker-messages.model';
 
 /**
  * Client-side shadow copy of the worker's `SessionFeatureRecord` (step-loader.worker.ts) — same
@@ -24,4 +24,5 @@ export type ClientFeatureRecord =
   | { featureId: string; kind: 'revolve'; label: string; sketchId: string; params: { axis: 'u' | 'v'; angleDeg: number; cut: boolean }; nodeId: string }
   | { featureId: string; kind: 'sweep'; label: string; sketchId: string; params: { axis: 'u' | 'v'; tiltDeg: number; distance: number; cut: boolean }; nodeId: string }
   | { featureId: string; kind: 'loft'; label: string; sketchIds: string[]; params: { cut: boolean }; nodeId: string }
-  | { featureId: string; kind: 'filletChamfer'; label: string; params: { filletChamferKind: FilletChamferKind; edges: FilletChamferEdgeValue[] }; nodeId: string };
+  | { featureId: string; kind: 'filletChamfer'; label: string; params: { filletChamferKind: FilletChamferKind; edges: FilletChamferEdgeValue[] }; nodeId: string }
+  | { featureId: string; kind: 'hole'; label: string; sketchId: string; params: HoleFeatureParams; nodeId: string };

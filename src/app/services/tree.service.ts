@@ -304,6 +304,37 @@ export class TreeService {
   }
 
   /**
+   * `deleteBody`, but returns everything `restoreBody` needs to put the node back exactly as it
+   * was — same node id, parent, position among its siblings, and flags (`featureId`,
+   * `hasStepSource`, visibility). Keeping the node id is what lets feature edits and STEP
+   * re-reads keep working on a restored part. Used by the undoable Delete.
+   */
+  detachBody(nodeId: string): DetachedBody | undefined {
+    const node = findNode(this.nodes(), nodeId);
+    const body = this.nodeIdToBody.get(nodeId);
+    if (!node || !body || !node.parentId) return undefined;
+    const parent = findNode(this.nodes(), node.parentId);
+    const index = parent ? parent.children.findIndex((n) => n.id === nodeId) : -1;
+    this.deleteBody(nodeId);
+    return { node: { ...node, children: structuredClone_(node.children) }, body, index };
+  }
+
+  /** Reverses `detachBody`. Caller re-adds the mesh to the scene. A no-op if the parent import is gone (e.g. the scene was replaced by a new Open since). */
+  restoreBody(detached: DetachedBody): void {
+    const { node, body, index } = detached;
+    if (!node.parentId || !findNode(this.nodes(), node.parentId)) return;
+
+    this.nodeIdToBody.set(node.id, body);
+    this.meshToNodeId.set(body.mesh, node.id);
+    this.nodes.update((current) => {
+      const clone = structuredClone_(current);
+      const parent = findNode(clone, node.parentId!);
+      if (parent) parent.children.splice(index < 0 ? parent.children.length : Math.min(index, parent.children.length), 0, { ...node, children: structuredClone_(node.children) });
+      return clone;
+    });
+  }
+
+  /**
    * Replaces an existing body node's underlying CadBody in place — same node id, same parent,
    * same position in the tree — as opposed to `deleteBody`+`registerBody`, which would re-parent
    * the replacement under `this.importId` (the *last-registered* import), silently moving it out
@@ -358,6 +389,41 @@ export class TreeService {
   allBodies(): CadBody[] {
     return [...this.nodeIdToBody.values()];
   }
+
+  /** Every body with its node id, in tree order — what a project save walks. */
+  bodyEntries(): { nodeId: string; body: CadBody }[] {
+    return [...this.nodeIdToBody.entries()].map(([nodeId, body]) => ({ nodeId, body }));
+  }
+
+  /** The plain-data part of the tree a project save stores (bodies and import sources are saved separately). */
+  exportState(): { nodes: TreeNode[]; rootId: string | null; importId: string | null; importSources: Map<string, string | File> } {
+    return { nodes: structuredClone_(this.nodes()), rootId: this.rootId, importId: this.importId, importSources: new Map(this.importSource) };
+  }
+
+  /**
+   * Replaces the whole tree with a saved one (project open). `bodies` maps each body node id to
+   * its rebuilt CadBody; `importSources` maps each import node id to its STEP file. Caller has
+   * already cleared the scene and adds the meshes.
+   */
+  restoreState(state: { nodes: TreeNode[]; rootId: string | null; importId: string | null }, bodies: Map<string, CadBody>, importSources: Map<string, File>): void {
+    this.reset();
+    this.rootId = state.rootId;
+    this.importId = state.importId;
+    for (const [nodeId, source] of importSources) this.importSource.set(nodeId, source);
+    for (const [nodeId, body] of bodies) {
+      this.nodeIdToBody.set(nodeId, body);
+      this.meshToNodeId.set(body.mesh, nodeId);
+    }
+    this.nodes.set(structuredClone_(state.nodes));
+  }
+}
+
+/** A body node removed by `TreeService.detachBody`, with what `restoreBody` needs to reinsert it. */
+export interface DetachedBody {
+  node: TreeNode;
+  body: CadBody;
+  /** Position among the parent's children at detach time. */
+  index: number;
 }
 
 function findNode(nodes: TreeNode[], id: string): TreeNode | undefined {

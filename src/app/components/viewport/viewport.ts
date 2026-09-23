@@ -4,7 +4,7 @@ import { ViewerService } from '../../services/viewer.service';
 import { CameraService } from '../../services/camera.service';
 import { RenderService } from '../../services/render.service';
 import { StepLoaderService } from '../../services/step-loader.service';
-import { TreeService } from '../../services/tree.service';
+import { DetachedBody, TreeService } from '../../services/tree.service';
 import { SelectionService } from '../../services/selection.service';
 import { PropertyService } from '../../services/property.service';
 import { MeasurementService } from '../../services/measurement.service';
@@ -23,6 +23,7 @@ import { ReferencePlaneService } from '../../services/reference-plane.service';
 import { ReferencePlaneRendererService } from '../../services/reference-plane-renderer.service';
 import { ShellToolService } from '../../services/shell-tool.service';
 import { DraftToolService } from '../../services/draft-tool.service';
+import { ProjectService } from '../../services/project.service';
 import { ViewPreset } from '../../models/view-preset.model';
 import { CadBody } from '../../models/cad-body.model';
 import { SKETCH_SHAPE_POINT_COUNT, SketchShape } from '../../models/sketch.model';
@@ -72,6 +73,7 @@ export class Viewport implements AfterViewInit, OnDestroy {
   @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('navCubeCanvas', { static: true }) navCubeCanvasRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('stepFileInput', { static: true }) stepFileInputRef!: ElementRef<HTMLInputElement>;
+  @ViewChild('projectFileInput', { static: true }) projectFileInputRef!: ElementRef<HTMLInputElement>;
   @ViewChild(ToolPanels, { static: true }) toolPanels!: ToolPanels;
 
   private pointerDownPos: { x: number; y: number } | null = null;
@@ -86,6 +88,7 @@ export class Viewport implements AfterViewInit, OnDestroy {
 
   // --- Loading dialog ---
   readonly loadingProgress;
+  readonly projectBusyMessage;
   get loadingVisible(): boolean {
     const phase = this.loadingProgress().phase;
     return phase !== 'idle' && phase !== 'done';
@@ -121,9 +124,11 @@ export class Viewport implements AfterViewInit, OnDestroy {
     private readonly referencePlaneTool: ReferencePlaneService,
     private readonly referencePlaneRenderer: ReferencePlaneRendererService,
     private readonly shellTool: ShellToolService,
-    private readonly draftTool: DraftToolService
+    private readonly draftTool: DraftToolService,
+    private readonly project: ProjectService
   ) {
     this.loadingProgress = this.stepLoader.progress;
+    this.projectBusyMessage = this.project.busyMessage;
 
     // Keeps the transform gizmo attached to whichever body SelectionService currently considers
     // "primary" (selectedBodyId) — the gizmo follows selection automatically rather than needing
@@ -301,6 +306,18 @@ export class Viewport implements AfterViewInit, OnDestroy {
     this.stepFileInputRef.nativeElement.click();
   }
 
+  /** "Open Project…" entry point — the project counterpart of `promptImportStepFile`. */
+  promptOpenProjectFile(): void {
+    this.projectFileInputRef.nativeElement.click();
+  }
+
+  async onProjectFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    if (file) await this.project.open(file);
+  }
+
   async onStepFileSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0] ?? null;
@@ -309,16 +326,12 @@ export class Viewport implements AfterViewInit, OnDestroy {
     if (!file) return;
 
     try {
-      // "Open" replaces whatever's currently loaded (single-document convention) rather than
-      // appending — TreeService.registerImport is append-by-design (it's what a future explicit
-      // "Import" action would want), so the clear happens here, mirroring deletePart's dispose
-      // sequence but for the whole scene: drop selection/properties/gizmo state before the old
-      // meshes are gone, then dispose them, then reset the tree.
-      this.selection.clearSelection();
-      this.property.showProperties(null);
-      this.objectTransform.setAttachedBody(null);
-      this.viewer.clearBodies();
-      this.tree.reset();
+      // "Open" replaces the whole document (single-document convention) rather than appending —
+      // TreeService.registerImport is append-by-design (it's what a future explicit "Import"
+      // action would want). resetDocument also clears the Feature Tree, undo stack and modeling
+      // session; before 2026-09-24 those survived an Open, so an old Undo or Feature Tree row
+      // could reach into the new document.
+      this.project.resetDocument();
 
       // Retain the File itself (not just its name) so a later sketch/cut on one of this
       // import's bodies can re-read the original STEP bytes — loadStepFileFromBlob's own
@@ -611,8 +624,26 @@ export class Viewport implements AfterViewInit, OnDestroy {
 
     const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, origin);
     const worldPoint = new THREE.Vector3();
-    if (!raycaster.ray.intersectPlane(plane, worldPoint)) return null;
-    return worldPoint;
+    if (raycaster.ray.intersectPlane(plane, worldPoint)) return worldPoint;
+
+    // Ray parallel to the sketch plane — the same THREE.Ray.intersectPlane behavior
+    // handlePrimitiveClick's own fallback documents (a real, genuine miss, not a degenerate zero
+    // point). Reachable for a sketch plane too: e.g. picking a face (which orients the camera
+    // normal to it via CameraService.animateToFace), then switching a Loft's next profile to a
+    // datum plane roughly edge-on to that same camera orientation, with no re-orientation between
+    // the two — the click ray from screen center then has ~zero component along the datum's
+    // normal. Found via Playwright while verifying Loft's own face-anchoring fix (a Loft profile
+    // on the XZ datum right after a Z-normal face pick reproduced it on the very first attempt).
+    // Fall back to the camera's own view plane through the SKETCH plane's origin (not the world
+    // origin, so the fallback point stays spatially close to the real plane) — guaranteed
+    // non-parallel to any ray the camera can cast, since the view plane's normal IS the camera's
+    // own look direction. `projectToPlane` below discards whatever out-of-plane component this
+    // introduces via its own dot-product math, so the result is still the correct (u, v) for
+    // wherever the cursor visually points.
+    const viewNormal = new THREE.Vector3();
+    activeCamera.getWorldDirection(viewNormal);
+    const viewPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(viewNormal, origin);
+    return raycaster.ray.intersectPlane(viewPlane, worldPoint) ? worldPoint : null;
   }
 
   /** Finds the nearest cached reference point within a fixed screen-space pixel threshold, or null if none qualifies. Snapping overrides the raw raycast hit entirely, not just visually. */
@@ -1102,29 +1133,47 @@ export class Viewport implements AfterViewInit, OnDestroy {
     this.closeContextMenu();
   }
 
-  /** Prompts for confirmation (delete is irreversible in-session) then removes the part. Shared by the context menu and the model tree's delete control. */
+  /** Prompts for confirmation then removes the part. Shared by the context menu, the Delete key and the model tree's delete control. */
   confirmAndDeletePart(nodeId: string): void {
     const node = this.tree.findNode(nodeId);
     if (!node) return;
     // eslint-disable-next-line no-alert
-    if (!confirm(`Delete part "${node.label}"? This cannot be undone.`)) return;
+    if (!confirm(`Delete part "${node.label}"? (Ctrl+Z undoes this.)`)) return;
     this.deletePart(nodeId);
   }
 
-  /** Removes a part: disposes its mesh from the scene, drops it from the tree, and clears selection/properties if it was the active one. */
+  /**
+   * Removes a part as an undoable step. Undo puts the same tree node back (same id, place and
+   * feature link — see `TreeService.detachBody`) and re-adds the same mesh, the way Duplicate's and
+   * Pattern's undo/redo already re-add a mesh `removeBody` disposed (three.js re-uploads its
+   * buffers on the next render). The worker's feature history is untouched by a delete, so a
+   * restored feature body stays editable.
+   */
   private deletePart(nodeId: string): void {
-    const body = this.tree.deleteBody(nodeId);
-    if (!body) return;
-
-    if (this.selection.state().selectedBodyId === body.id) {
-      this.selection.clearSelection();
-    }
-    this.property.clearIfSelected(body.id);
-    // Explicit, synchronous detach rather than relying on the selectedBodyId effect above —
-    // that effect is scheduled, not synchronous, so without this TransformControls could still
-    // hold a reference to the mesh for one tick after removeBody disposes it below.
-    this.objectTransform.setAttachedBody(null);
-    this.viewer.removeBody(body.mesh);
+    const label = this.tree.findNode(nodeId)?.label ?? 'part';
+    let detached: DetachedBody | undefined;
+    this.history.run({
+      label: `Delete: ${label}`,
+      redo: () => {
+        detached = this.tree.detachBody(nodeId);
+        if (!detached) return;
+        const body = detached.body;
+        if (this.selection.state().selectedBodyId === body.id) {
+          this.selection.clearSelection();
+        }
+        this.property.clearIfSelected(body.id);
+        // Explicit, synchronous detach rather than relying on the selectedBodyId effect above —
+        // that effect is scheduled, not synchronous, so without this TransformControls could still
+        // hold a reference to the mesh for one tick after removeBody disposes it below.
+        this.objectTransform.setAttachedBody(null);
+        this.viewer.removeBody(body.mesh);
+      },
+      undo: () => {
+        if (!detached) return;
+        this.tree.restoreBody(detached);
+        if (this.tree.getBodyForNodeId(nodeId) === detached.body) this.viewer.addBody(detached.body.mesh);
+      }
+    });
   }
 
   ngOnDestroy(): void {

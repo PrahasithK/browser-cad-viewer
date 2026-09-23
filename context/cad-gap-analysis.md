@@ -81,13 +81,13 @@ Legend for "Recommended architecture": the module names refer to the target stru
 | Modeling | Extrude | Blind depth, boss or cut, both-way tool for cuts | **Partial** | Mid-plane, up-to-surface/body/next, offset start, draft angle, thin-wall, multi-profile/contour selection, "merge result" option | P1 | Feature-type registry with declarative parameter schema |
 | Modeling | Revolve | Sketch-plane U or V axis, 1–360°, boss/cut, into existing body | **Partial** | Drawn centerline or edge as axis, two-direction, thin revolve | P1 | Same |
 | Modeling | Sweep | **Straight, tilted path only** (0–89°); effectively an oblique extrude | **Partial** | Path along curve/edge/sketch, guide curves, twist, orientation control, profile-on-face. A real sweep does not exist yet | P1 | OCCT `BRepOffsetAPI_MakePipeShell` behind a feature type |
-| Modeling | Loft | 2+ profiles via `ThruSections`, boss/cut into existing body; edit = Cut checkbox only | **Partial** | Guide curves, closed loop, end tangency, profile add/remove/reorder after creation, centerline loft | P2 | Feature type with profile list as references |
+| Modeling | Loft | 2+ profiles via `ThruSections`, boss/cut into existing body; edit = Cut checkbox only. **Fixed 2026-09-23**: profiles sketched directly on the target's own surface (the normal face-anchored workflow) previously made Cut/Fuse silently remove/add ~0 volume despite reporting success — root-caused via a Node kernel probe to an exact-coincidence degeneracy in the boolean step, fixed by nudging each profile wire 0.01mm off its plane before the boolean op. A separate, deeper `ThruSections` smooth-blend numerical instability for near-symmetric adjacent-perpendicular-face profile pairs was found while verifying the fix and is **not** fixed — logged as its own open item (see architecture.md's 2026-09-23 entry) | **Partial** | Guide curves, closed loop, end tangency, profile add/remove/reorder after creation, centerline loft, the smooth-blend instability just noted | P2 | Feature type with profile list as references |
 | Modeling | Boolean operations | Only implicit: a cut/fuse against **one** target body inside Extrude/Revolve/Sweep/Loft | **Partial** | Combine (add/subtract/intersect) between arbitrary bodies, split body, keep-tools, multi-body scope | P1 | `Combine`/`Split` feature types; body-ref inputs |
 | Modeling | Fillet / Chamfer | Edge picking, radius or distance **per edge**, multi-edge, STEP-imported bodies, including ones already cut in-session (verified); Feature Tree lists fillets in the working tree | **Partial** | Docs' once-per-page hang **not reproduced (C2)**; ~14 s per fillet (fresh worker + OCCT init); radius tapering along an edge, face fillet, full-round, setback, tangent propagation, two-distance/angle chamfer; behaviour on primitives untested | P1 | Kernel adapter + persistent naming so edge refs survive; feature type |
 | Modeling | Shell | Uniform thickness, remove picked faces, STEP pristine bodies only; positive-volume `Complemented()` repair | **Partial** | Multi-thickness, outward shell, in-app bodies, feature tree, robust failure modes | P1 | Feature type + validation gate |
 | Modeling | Patterns | Linear/Circular, axis-aligned, count incl. original; **creates transform-only mesh clones**, not B-Rep | **Partial** | Pattern of a *feature*, curve/table/fill/sketch-driven, skip instances, linked instances, arbitrary axis/direction. Copies cannot be cut, filleted, exported to STEP | P1 | Pattern as feature operating on B-Rep, instances share definition |
 | Modeling | Mirror | 3 datum planes; negative-scale mesh clone; exact only for unrotated bodies (documented approximation) | **Partial** | Arbitrary plane/face mirror, mirror-of-features, exact reflection for any pose, real B-Rep result | P1 | `BRepBuilderAPI_Transform` with mirror `gp_Trsf` in kernel |
-| Modeling | Hole features | Through-hole clearance presets: metric M3–M12, inch #4-40…3/8-16, close/normal/loose | **Partial** | Counterbore, countersink, tapped/threaded, blind, hole series, multiple holes, cosmetic threads, hole table | P1 | Hole feature (composite tool solid) + standards library |
+| Modeling | Hole features | Through-hole clearance presets: metric M3–M12, inch #4-40…3/8-16, close/normal/loose. **Counterbore and countersink added 2026-09-24** (composite tool solid, standard socket-head/flat-head sizes per fastener, editable in the Feature Tree as its own `hole` feature kind; verified against analytical volumes) | **Partial** | Tapped/threaded, blind, hole series, multiple holes, cosmetic threads, hole table, warning when a counterbore is deeper than the part | P1 | Hole feature (composite tool solid) + standards library |
 | Modeling | Draft | Faces on STEP pristine body; **world +Z pull only**; neutral plane placed at min-Z vertex (found after ~10 failed hypotheses) | **Partial** | User pull direction, neutral plane / parting line, per-face angle, draft analysis | P2 | Feature type; requires validation gate (Draft "succeeded" with no-op geometry repeatedly) |
 | Modeling | Direct modeling | None | **Planned** (push/pull) | Move/offset/delete face, replace face, defeature | P2 | Kernel adapter ops (`BRepOffsetAPI_MakeOffset`, `BRepAlgoAPI`, `BRepFeat`) |
 | Modeling | Surface modeling | None (Bridge Mesh is a display-only overlay) | **Planned** | Extruded/revolved/swept/lofted/boundary/fill/offset surfaces, knit, trim | P2 | Non-solid feature outputs in the same DAG |
@@ -170,7 +170,7 @@ Legend for "Recommended architecture": the module names refer to the target stru
 
 | Area | Capability | Existing | Status | Missing | Pri | Architecture |
 |---|---|---|---|---|---|---|
-| Data | STEP import | Single file, replaces scene; solids only as "Body N" | **Partial** | Assembly structure, instance transforms, names, colours, layers, PMI (AP242), surfaces/shells, unit handling proof, healing | P1 | `io/step` using OCCT XDE (`STEPCAFControl_Reader`) |
+| Data | STEP import | Single file, replaces scene; solids only as "Body N". **Fixed 2026-09-23**: a real, unusually large file (112MB, 26 solids) crashed every attempt with "Maximum call stack size exceeded" — root-caused to a native stack overflow inside OCCT's own compiled destructor for the STEP reader (a real recursive C++ call chain, not app JS), confirmed via a browser stack trace and fixed by skipping that one cleanup call on the (single-use, always-terminated-after) import Worker. A related traversal bug found and fixed in the same pass (see architecture.md's 2026-09-23 entry). **Not fixed**: the same original bytes get re-parsed (and could hit the identical overflow) inside the long-lived session Worker if a feature-tree operation later needs to re-resolve them (e.g. cutting into the originally-imported body) — only the import path itself was addressed | **Partial** | Assembly structure, instance transforms, names, colours, layers, PMI (AP242), surfaces/shells, unit handling proof, healing, the session-Worker re-resolution risk just noted | P1 | `io/step` using OCCT XDE (`STEPCAFControl_Reader`) |
 | Data | STEP export | Only bodies retaining original STEP source; everything modelled in-app is **skipped** | **Partial** | Export of any body incl. all in-app geometry, colours, names, assembly structure | **P0** | Kernel writes from live shape handles (worker already holds them) |
 | Data | IGES | None | **Planned** | | P2 | OCCT `IGESControl_*` |
 | Data | STL | Export only (binary, world space, from render mesh) | **Partial** | STL import; export quality tied to *display* tessellation; ASCII option | P2 | Separate tessellation profile per output |
@@ -337,7 +337,7 @@ The 100+ table rows collapse into **30 capability clusters** (many rows share on
 ### B4. Unified document model, native format, autosave, recovery
 1. One serialisable object describing the entire design (features, sketches, bodies, references, materials, views, assembly), saved to disk and reopened losslessly.
 2. Without it there is no product: closing the tab loses everything (manual §3.11, §10).
-3. State is spread over ~39 singleton services plus Three.js meshes; nothing is serialisable as a whole. Only `panel-layout-v1` is persisted.
+3. State is spread over ~39 singleton services plus Three.js meshes; nothing is serialisable as a whole. Only `panel-layout-v1` is persisted. **Save/Open/New shipped 2026-09-24** (`ProjectService`, `.cadproj`): a snapshot of every body + tree + Feature Tree, the modeling session's request log replayed on open (so features stay editable), and the original STEP files keyed by SHA-256, in a gzip-compressed JSON-header-plus-binary container. Still missing: autosave/recovery, a `beforeunload` guard, Save As, and reference planes/structural model/measurements/section planes in the file.
 4. `document` + `io/native` + browser storage adapter.
 5. B3 (what to serialise), kernel shape serialisation (`BRepTools::Write` or STEP per body as cache).
 6. Versioned schema (JSON) in a zip container (features, sketches, thumbnails, optional cached B-Rep blobs); IndexedDB write-ahead journal for autosave; File System Access API for save/save-as; migration functions per schema version; `beforeunload` guard.
@@ -346,7 +346,7 @@ The 100+ table rows collapse into **30 capability clusters** (many rows share on
 
 ### B5. Undo/redo for geometry, delete, import
 1. Reverses any modelling action, including creation and deletion.
-2. Users treat "Delete cannot be undone" as a defect. It is the least professional line in the manual.
+2. Users treat "Delete cannot be undone" as a defect. It is the least professional line in the manual. **Delete is undoable since 2026-09-24** (the tree node is detached and restored with the same id/place/flags; the mesh is re-added the way Duplicate/Pattern undo already did). Creation and import are still not undoable.
 3. Closure-based history wired at call sites; geometry changes dispose GPU buffers and mutate worker shapes with "no snapshot to restore".
 4. `document` command bus; `render` resource manager.
 5. B4 (immutable/versioned document), deferred GPU disposal.
@@ -387,7 +387,7 @@ The 100+ table rows collapse into **30 capability clusters** (many rows share on
 ### B9. Hole and fastener features
 1. cbore/csink/tapped/blind holes with standard sizes and callouts.
 2. Mechanical design leans on them; drawings need hole callouts.
-3. Through clearance holes only. Docs correctly state counterbore was blocked by the cut pipeline's re-read-original-bytes limit, which B7 removes.
+3. **Counterbore/countersink done 2026-09-24.** Hole Wizard moved onto the parametric feature tree on 2026-09-22, which removed the blocker (a second targeted cut on an already-modified part now works). On 2026-09-24 it got its own `hole` feature kind with a compound tool solid (through-cylinder fused with a counterbore cylinder or countersink cone), standard sizes per fastener, and Feature Tree editing of type and sizes. Still missing: tapped/blind holes, hole series, callouts.
 4. `kernel` hole feature + `standards`.
 5. B7; standards data (B25).
 6. Hole = a revolved tool profile (stepped) + position sketch points; thread as cosmetic (metadata) first, modelled thread later.
@@ -798,7 +798,7 @@ Sizing is relative (S/M/L/XL/XXL), not calendar time. Phases 4–7 can be reorde
 
 ### 7.1 Top 20 missing capabilities (ranked)
 
-1. Native document format: save, open, autosave, crash recovery.
+1. Native document format: save, open (**done 2026-09-24**), autosave, crash recovery (still missing).
 2. Sketch constraint solver with driving dimensions and a real entity set.
 3. Persistent topological naming and a reference model (**partly done 2026-09-21**: planar-face anchoring for sketch-based features; permanent identity, edges and other feature types remain).
 4. Full parametric history: all tools, sketch editing, DAG, rollback, suppress, reorder.

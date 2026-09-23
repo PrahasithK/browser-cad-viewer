@@ -669,7 +669,28 @@
           </select>
         </label>
 
+        <label class="field">
+          Type
+          <select [value]="holeWizardState().holeType" (change)="onHoleWizardTypeChange($event)" title="Hole type">
+            <option value="simple">Simple</option>
+            <option value="counterbore">Counterbore</option>
+            <option value="countersink">Countersink</option>
+          </select>
+        </label>
+
+        @if (holeWizardState().holeType === 'counterbore') {
+          <label class="field">C'bore Ø (mm)<input type="number" min="0.1" step="0.1" [value]="holeWizardState().cboreDiameter" (input)="onHoleWizardEntrySizeChange('cboreDiameter', $event)" /></label>
+          <label class="field">C'bore depth (mm)<input type="number" min="0.1" step="0.1" [value]="holeWizardState().cboreDepth" (input)="onHoleWizardEntrySizeChange('cboreDepth', $event)" /></label>
+        }
+        @if (holeWizardState().holeType === 'countersink') {
+          <label class="field">C'sink Ø (mm)<input type="number" min="0.1" step="0.1" [value]="holeWizardState().csinkDiameter" (input)="onHoleWizardEntrySizeChange('csinkDiameter', $event)" /></label>
+          <label class="field">C'sink angle (°)<input type="number" min="1" max="179" step="1" [value]="holeWizardState().csinkAngleDeg" (input)="onHoleWizardEntrySizeChange('csinkAngleDeg', $event)" /></label>
+        }
+
         <div class="hint">Hole diameter: {{ holeWizardDiameter().toFixed(2) }} mm (through-hole)</div>
+        @if (holeWizardEntryError()) {
+          <div class="error">{{ holeWizardEntryError() }}</div>
+        }
 
         <div class="inline-row">
           <button type="button" class="extrude-btn" [disabled]="!canCommitHoleWizard() || holeWizardBusy()" (click)="applyHoleWizard()">
@@ -976,8 +997,29 @@
                         </label>
                       }
                     }
+                    @case ('hole') {
+                      <!-- No Cut checkbox — a hole always removes material. Face and center are fixed at creation. -->
+                      @if (featureEditHole; as hole) {
+                        <label class="field">Type
+                          <select (change)="onFeatureEditHoleTypeChange($event)">
+                            <option value="simple" [selected]="hole.holeType === 'simple'">Simple</option>
+                            <option value="counterbore" [selected]="hole.holeType === 'counterbore'">Counterbore</option>
+                            <option value="countersink" [selected]="hole.holeType === 'countersink'">Countersink</option>
+                          </select>
+                        </label>
+                        <label class="field">Hole Ø (mm)<input type="number" min="0.1" step="0.1" [value]="hole.diameter" (input)="onFeatureEditHoleSizeChange('diameter', $event)" /></label>
+                        @if (hole.holeType === 'counterbore') {
+                          <label class="field">C'bore Ø (mm)<input type="number" min="0.1" step="0.1" [value]="hole.cboreDiameter" (input)="onFeatureEditHoleSizeChange('cboreDiameter', $event)" /></label>
+                          <label class="field">C'bore depth (mm)<input type="number" min="0.1" step="0.1" [value]="hole.cboreDepth" (input)="onFeatureEditHoleSizeChange('cboreDepth', $event)" /></label>
+                        }
+                        @if (hole.holeType === 'countersink') {
+                          <label class="field">C'sink Ø (mm)<input type="number" min="0.1" step="0.1" [value]="hole.csinkDiameter" (input)="onFeatureEditHoleSizeChange('csinkDiameter', $event)" /></label>
+                          <label class="field">C'sink angle (°)<input type="number" min="1" max="179" step="1" [value]="hole.csinkAngleDeg" (input)="onFeatureEditHoleSizeChange('csinkAngleDeg', $event)" /></label>
+                        }
+                      }
+                    }
                   }
-                  @if (feature.kind !== 'filletChamfer') {
+                  @if (feature.kind !== 'filletChamfer' && feature.kind !== 'hole') {
                     <label class="field checkbox">
                       <input type="checkbox" [checked]="featureEditCut" (change)="onFeatureEditCutChange($event)" />
                       Cut (remove material)
@@ -1010,6 +1052,9 @@
                     }
                     @case ('filletChamfer') {
                       {{ feature.label }} — {{ feature.params.edges.length }} edge{{ feature.params.edges.length === 1 ? '' : 's' }}
+                    }
+                    @case ('hole') {
+                      {{ holeRowLabel(feature.label, feature.params.holeType) }} — Ø{{ feature.params.diameter }}mm
                     }
                   }
                 </button>

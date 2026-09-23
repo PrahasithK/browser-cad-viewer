@@ -162,7 +162,32 @@ export type FeatureRecord =
       params: { filletChamferKind: FilletChamferKind; edges: FilletChamferEdgeValue[] };
       targetRef: DocBodyRef;
       producesBodyId: string;
-    };
+    }
+  | { featureId: string; kind: 'hole'; sketchId: string; params: HoleFeatureParams; targetRef: DocBodyRef; producesBodyId: string };
+
+/** Plain through-hole, or a through-hole with a stepped (counterbore) or conical (countersink) entry at the picked face. */
+export type HoleType = 'simple' | 'counterbore' | 'countersink';
+
+/**
+ * Everything a Hole Wizard hole needs to rebuild its tool solid (added 2026-09-24 for
+ * counterbore/countersink — until then a hole was stored as a plain `kind: 'extrude'` cut). The
+ * hole's CENTER and plane come from its committed sketch (a single circle entity whose radius is
+ * ignored in favour of `diameter`, so an edit can change the size without re-committing the
+ * sketch); every size lives here. `depth` is the through-cut's half-length, measured both ways
+ * from the face — computed once from the body's size at creation, never shown to the user.
+ * Counterbore/countersink fields are carried for every `holeType` (only the matching pair is
+ * read) so switching type in an edit keeps sensible values instead of starting from zero.
+ */
+export interface HoleFeatureParams {
+  holeType: HoleType;
+  diameter: number;
+  depth: number;
+  cboreDiameter: number;
+  cboreDepth: number;
+  csinkDiameter: number;
+  /** Included angle of the countersink cone (90° metric, 82° inch flat-head screws). */
+  csinkAngleDeg: number;
+}
 
 /** Fillet rounds an edge with a fixed radius; chamfer bevels it with a fixed setback distance — same edge-selection input, different BRepFilletAPI maker class worker-side. */
 export type FilletChamferKind = 'fillet' | 'chamfer';
@@ -365,8 +390,15 @@ export type StepWorkerRequest =
         | { kind: 'revolve'; axis: 'u' | 'v'; angleDeg: number; cut: boolean }
         | { kind: 'sweep'; axis: 'u' | 'v'; tiltDeg: number; distance: number; cut: boolean }
         | { kind: 'loft'; cut: boolean }
-        | { kind: 'filletChamfer'; filletChamferKind: FilletChamferKind; edges: FilletChamferEdgeValue[] };
+        | { kind: 'filletChamfer'; filletChamferKind: FilletChamferKind; edges: FilletChamferEdgeValue[] }
+        | ({ kind: 'hole' } & HoleFeatureParams);
     }
+  /**
+   * A Hole Wizard hole: cuts a through-hole (plus an optional counterbore/countersink entry) into
+   * `targetBody` at the center of the committed single-circle sketch. Always a cut into an existing
+   * body, so `targetBody`/`producesBodyId` are required, like `feature.filletChamfer`'s own.
+   */
+  | { type: 'feature.hole'; sessionId: string; featureId: string; sketchId: string; params: HoleFeatureParams; targetBody: DocBodyRef; producesBodyId: string }
   /**
    * `cut`+`targetBody` (both optional) let Revolve target an existing body's own solid, exactly
    * the way `feature.extrude` already does: `targetBody` names the picked-face body to re-read
